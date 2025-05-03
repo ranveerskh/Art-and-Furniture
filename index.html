@@ -170,28 +170,20 @@
 <!-- Firebase SDKs -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
-  authDomain: "epoxyresin-60ea7.firebaseapp.com",
-  projectId: "epoxyresin-60ea7",
-  storageBucket: "epoxyresin-60ea7.firebasestorage.app",
-  messagingSenderId: "591026708184",
-  appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
 <script>
-  const validUsers = {
-    "Ranveer": "8epoxyResin@@",
-    "Aman": "8resinEpoxy@@"
-  };
+  // Initialize Firebase (correct way using compat SDK)
+  firebase.initializeApp({
+    apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
+    authDomain: "epoxyresin-60ea7.firebaseapp.com",
+    projectId: "epoxyresin-60ea7",
+    storageBucket: "epoxyresin-60ea7.appspot.com",
+    messagingSenderId: "591026708184",
+    appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
+  });
+
+  const db = firebase.firestore();
+</script>
+
 
   let currentUser = null;
   let allEntries = [];
@@ -199,16 +191,18 @@ const app = initializeApp(firebaseConfig);
 async function login() {
   const user = document.getElementById("loginUser").value.trim();
   const pass = document.getElementById("loginPass").value.trim();
+  
   if (validUsers[user] === pass) {
     currentUser = user;
     document.getElementById("loginPage").style.display = "none";
     document.getElementById("mainApp").style.display = "block";
     document.getElementById("loggedInUser").innerText = "Logged in as: " + currentUser;
-    await loadData(); // Wait for Firebase to load user data
+    await loadData();
   } else {
     document.getElementById("loginError").innerText = "Invalid username or password!";
   }
 }
+
 
 
   function logout() {
