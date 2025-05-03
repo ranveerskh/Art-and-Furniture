@@ -182,26 +182,37 @@
   });
 
   const db = firebase.firestore();
+
+let currentUser = null;
+let allEntries = [];
+...
+
 </script>
 
-
-  let currentUser = null;
-  let allEntries = [];
 
 async function login() {
   const user = document.getElementById("loginUser").value.trim();
   const pass = document.getElementById("loginPass").value.trim();
+
+  const userDoc = await db.collection("users").doc(user).get();
   
-  if (validUsers[user] === pass) {
+  if (!userDoc.exists) {
+    document.getElementById("loginError").innerText = "User does not exist!";
+    return;
+  }
+
+  const userData = userDoc.data();
+  if (userData.password === pass) {
     currentUser = user;
     document.getElementById("loginPage").style.display = "none";
     document.getElementById("mainApp").style.display = "block";
     document.getElementById("loggedInUser").innerText = "Logged in as: " + currentUser;
     await loadData();
   } else {
-    document.getElementById("loginError").innerText = "Invalid username or password!";
+    document.getElementById("loginError").innerText = "Invalid password!";
   }
 }
+
 
 
 
