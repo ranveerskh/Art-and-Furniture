@@ -189,31 +189,41 @@ let allEntries = [];
 
 </script>
 
-
 async function login() {
   const user = document.getElementById("loginUser").value.trim();
   const pass = document.getElementById("loginPass").value.trim();
 
-  const userDoc = await db.collection("users").doc(user).get();
-  
-  if (!userDoc.exists) {
-    document.getElementById("loginError").innerText = "User does not exist!";
+  console.log("Attempting to login with user:", user); // Debug log
+
+  if (!user || !pass) {
+    document.getElementById("loginError").innerText = "Please enter both username and password.";
     return;
   }
 
-  const userData = userDoc.data();
-  if (userData.password === pass) {
-    currentUser = user;
-    document.getElementById("loginPage").style.display = "none";
-    document.getElementById("mainApp").style.display = "block";
-    document.getElementById("loggedInUser").innerText = "Logged in as: " + currentUser;
-    await loadData();
-  } else {
-    document.getElementById("loginError").innerText = "Invalid password!";
+  try {
+    const userDoc = await db.collection("users").doc(user).get();
+    console.log("User document:", userDoc.data()); // Debug log
+
+    if (!userDoc.exists) {
+      document.getElementById("loginError").innerText = "User does not exist!";
+      return;
+    }
+
+    const userData = userDoc.data();
+    if (userData.password === pass) {
+      currentUser = user;
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("mainApp").style.display = "block";
+      document.getElementById("loggedInUser").innerText = "Logged in as: " + currentUser;
+      await loadData();
+    } else {
+      document.getElementById("loginError").innerText = "Invalid password!";
+    }
+  } catch (error) {
+    console.error("Error logging in:", error); // Debug log
+    document.getElementById("loginError").innerText = "Something went wrong. Please try again.";
   }
 }
-
-
 
 
   function logout() {
