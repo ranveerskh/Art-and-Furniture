@@ -102,11 +102,12 @@
 </head>
 <body>
 
- <h2>Login</h2>
-  <div id="login-section">
-    <input type="email" id="email" placeholder="Email" />
-    <input type="password" id="password" placeholder="Password" />
-    <button onclick="handleLogin()">Login</button>
+  <div id="loginPage">
+    <h2>Login to Business Tracker</h2>
+    <input type="text" id="loginUser" placeholder="Username" required />
+    <input type="password" id="loginPass" placeholder="Password" required />
+    <button onclick="login()">Login</button>
+    <p id="loginError" style="color:red;"></p>
   </div>
 
   <div id="mainApp" style="display:none;">
@@ -166,37 +167,49 @@
       </div>
     </div>
   </div>
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
+  authDomain: "epoxyresin-60ea7.firebaseapp.com",
+  projectId: "epoxyresin-60ea7",
+  storageBucket: "epoxyresin-60ea7.firebasestorage.app",
+  messagingSenderId: "591026708184",
+  appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
+};
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
-      authDomain: "epoxyresin-60ea7.firebaseapp.com",
-      projectId: "epoxyresin-60ea7",
-      storageBucket: "epoxyresin-60ea7.firebasestorage.app",
-      messagingSenderId: "591026708184",
-      appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
-    };
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+<script>
+  const validUsers = {
+    "Ranveer": "8epoxyResin@@",
+    "Aman": "8resinEpoxy@@"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+  let currentUser = null;
+  let allEntries = [];
 
-    window.handleLogin = async function () {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        document.getElementById('login-section').classList.add('hidden');
-        document.getElementById('app').classList.remove('hidden');
-        loadExpenses();
-      } catch (error) {
-        alert("Login failed: " + error.message);
-      }
-    }
+async function login() {
+  const user = document.getElementById("loginUser").value.trim();
+  const pass = document.getElementById("loginPass").value.trim();
+  if (validUsers[user] === pass) {
+    currentUser = user;
+    document.getElementById("loginPage").style.display = "none";
+    document.getElementById("mainApp").style.display = "block";
+    document.getElementById("loggedInUser").innerText = "Logged in as: " + currentUser;
+    await loadData(); // Wait for Firebase to load user data
+  } else {
+    document.getElementById("loginError").innerText = "Invalid username or password!";
+  }
+}
+
 
   function logout() {
     currentUser = null;
@@ -215,20 +228,29 @@
     return new Date().toISOString().split("T")[0];
   }
 
-  function saveData() {
-    localStorage.setItem("entries", JSON.stringify(allEntries));
-  }
+ function saveData() {
+  db.collection("entries").doc(currentUser).set({
+    entries: allEntries
+  }).catch(error => {
+    console.error("Error saving to Firebase:", error);
+  });
+}
 
-  function loadData() {
-    const data = localStorage.getItem("entries");
-    if (data) {
-      allEntries = JSON.parse(data).map(entry => ({
+function loadData() {
+  db.collection("entries").doc(currentUser).get().then(doc => {
+    if (doc.exists) {
+      allEntries = doc.data().entries.map(entry => ({
         ...entry,
         ranveer: Number(entry.ranveer),
         aman: Number(entry.aman)
       }));
+      renderTable();
     }
-  }
+  }).catch(error => {
+    console.error("Error loading data:", error);
+  });
+}
+
 
   function exportCSV() {
     let csv = "Date,Type,Item,Ranveer,Aman,Added By\n";
