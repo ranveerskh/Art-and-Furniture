@@ -2,19 +2,176 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Business Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ranveer & Aman Business Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f0f0f0;
+    }
+    header {
+      background: #333;
+      color: white;
+      padding: 1rem;
+      text-align: center;
+    }
+    .container {
+      padding: 1rem;
+      max-width: 900px;
+      margin: auto;
+    }
+    .form-section {
+      background: white;
+      padding: 1rem;
+      margin-bottom: 2rem;
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    input, button, select {
+      padding: 10px;
+      font-size: 1rem;
+      flex: 1 1 45%;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      background: #28a745;
+      color: white;
+      cursor: pointer;
+      flex: 1 1 100%;
+    }
+    button:hover {
+      background: #218838;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    .summary {
+      background: white;
+      padding: 1rem;
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    #loginPage {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    #loginPage input, #loginPage button {
+      margin: 10px;
+      width: 250px;
+    }
+    #logoutBtn {
+      background: #dc3545;
+      color: white;
+      padding: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      float: right;
+      margin: 1rem;
+    }
+    .action-buttons button {
+      margin: 2px;
+      padding: 5px 10px;
+      font-size: 0.9rem;
+    }
+    @media (max-width: 600px) {
+      input, button, select {
+        flex: 1 1 100%;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div id="app"></div>
 
-  <script type="module">
-    // Import Firebase SDK
+  <div id="loginPage">
+    <h2>Login to Business Tracker</h2>
+    <input type="text" id="loginUser" placeholder="Username" required />
+    <input type="password" id="loginPass" placeholder="Password" required />
+    <button onclick="login()">Login</button>
+    <p id="loginError" style="color:red;"></p>
+  </div>
+
+  <div id="mainApp" style="display:none;">
+    <header>
+      <h1>Business Tracker - Ranveer & Aman</h1>
+      <span id="loggedInUser"></span>
+    </header>
+    <button id="logoutBtn" onclick="logout()">Logout</button>
+    <div class="container">
+      <div class="form-section">
+        <h2>Add Expense</h2>
+        <form id="expenseForm">
+          <input type="text" id="expenseItem" placeholder="Item Purchased" required>
+          <input type="number" id="paidRanveer" placeholder="Paid by Ranveer">
+          <input type="number" id="paidAman" placeholder="Paid by Aman">
+          <button type="submit">Add Expense</button>
+        </form>
+      </div>
+
+      <div class="form-section">
+        <h2>Add Payment Received</h2>
+        <form id="paymentForm">
+          <input type="text" id="paymentItem" placeholder="Payment For" required>
+          <input type="number" id="receivedRanveer" placeholder="Received by Ranveer">
+          <input type="number" id="receivedAman" placeholder="Received by Aman">
+          <button type="submit">Add Payment</button>
+        </form>
+      </div>
+
+      <div class="form-section">
+        <h2>Monthly Report - <span id="currentMonth"></span></h2>
+        <label for="entryFilter">Show:</label>
+        <select id="entryFilter" onchange="renderTable()">
+          <option value="10">Last 10</option>
+          <option value="thisMonth">This Month</option>
+          <option value="all">All</option>
+        </select>
+        <button onclick="exportCSV()">Export CSV</button>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Type</th>
+              <th>Item</th>
+              <th>Ranveer ($)</th>
+              <th>Aman ($)</th>
+              <th>Added By</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="dataTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="summary" id="summaryBox">
+        <p>Total Expenses and Settlements will show here.</p>
+      </div>
+    </div>
+  </div>
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-    // Your Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
       authDomain: "epoxyresin-60ea7.firebaseapp.com",
@@ -24,63 +181,183 @@
       appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
     };
 
-    // Initialize Firebase
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
 
-    // Example login function
-    async function login(email, password) {
+    window.handleLogin = async function () {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
       try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        console.log("Logged in as:", userCredential.user.email);
-        // call your dashboard display function here
+        await signInWithEmailAndPassword(auth, email, password);
+        document.getElementById('login-section').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        loadExpenses();
       } catch (error) {
-        console.error("Login error:", error.message);
         alert("Login failed: " + error.message);
       }
     }
 
-    // Example add expense function
-    async function addExpense(user, date, reason, amount, paidBy) {
-      try {
-        await addDoc(collection(db, "expenses"), {
-          user,
-          date,
-          reason,
-          amount,
-          paidBy
-        });
-        alert("Expense added!");
-      } catch (error) {
-        console.error("Error adding expense:", error);
-      }
-    }
+<script>
+  const validUsers = {
+    "Ranveer": "8epoxyResin@@",
+    "Aman": "8resinEpoxy@@"
+  };
 
-    // Example load expenses function
-    async function loadExpenses() {
-      const querySnapshot = await getDocs(collection(db, "expenses"));
-      querySnapshot.forEach((doc) => {
-        console.log(`${doc.id} =>`, doc.data());
+  let currentUser = null;
+  let allEntries = [];
+
+  function login() {
+    const user = document.getElementById("loginUser").value.trim();
+    const pass = document.getElementById("loginPass").value.trim();
+    if (validUsers[user] === pass) {
+      currentUser = user;
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("mainApp").style.display = "block";
+      document.getElementById("loggedInUser").innerText = "Logged in as: " + currentUser;
+      loadData();
+      renderTable();
+    } else {
+      document.getElementById("loginError").innerText = "Invalid username or password!";
+    }
+  }
+
+  function logout() {
+    currentUser = null;
+    document.getElementById("loginPage").style.display = "flex";
+    document.getElementById("mainApp").style.display = "none";
+    document.getElementById("loginUser").value = "";
+    document.getElementById("loginPass").value = "";
+  }
+
+  function getCurrentMonth() {
+    const now = new Date();
+    return now.toLocaleString('default', { month: 'long', year: 'numeric' });
+  }
+
+  function getCurrentDate() {
+    return new Date().toISOString().split("T")[0];
+  }
+
+  function saveData() {
+    localStorage.setItem("entries", JSON.stringify(allEntries));
+  }
+
+  function loadData() {
+    const data = localStorage.getItem("entries");
+    if (data) {
+      allEntries = JSON.parse(data).map(entry => ({
+        ...entry,
+        ranveer: Number(entry.ranveer),
+        aman: Number(entry.aman)
+      }));
+    }
+  }
+
+  function exportCSV() {
+    let csv = "Date,Type,Item,Ranveer,Aman,Added By\n";
+    allEntries.forEach(entry => {
+      csv += `${entry.date},${entry.type},${entry.item},${entry.ranveer},${entry.aman},${entry.addedBy}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'business_tracker.csv';
+    a.click();
+  }
+
+  function deleteEntry(index) {
+    if (confirm("Are you sure you want to delete this entry?")) {
+      allEntries.splice(index, 1);
+      saveData();
+      renderTable();
+    }
+  }
+
+  function renderTable() {
+    const tableBody = document.getElementById("dataTableBody");
+    const filter = document.getElementById("entryFilter").value;
+    tableBody.innerHTML = "";
+
+    let ranveerBalance = 0, amanBalance = 0;
+    let filteredEntries = [...allEntries];
+
+    if (filter === "10") {
+      filteredEntries = allEntries.slice(-10);
+    } else if (filter === "thisMonth") {
+      const now = new Date();
+      filteredEntries = allEntries.filter(e => {
+        const date = new Date(e.date);
+        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
       });
     }
 
-    // Example delete expense function
-    async function deleteExpense(expenseId) {
-      try {
-        await deleteDoc(doc(db, "expenses", expenseId));
-        alert("Expense deleted!");
-      } catch (error) {
-        console.error("Error deleting expense:", error);
+    filteredEntries.forEach((entry, index) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${entry.date}</td>
+        <td>${entry.type}</td>
+        <td>${entry.item}</td>
+        <td>${entry.ranveer.toFixed(2)}</td>
+        <td>${entry.aman.toFixed(2)}</td>
+        <td>${entry.addedBy}</td>
+        <td class="action-buttons">
+          <button onclick="deleteEntry(${index})">Delete</button>
+        </td>
+      `;
+      tableBody.appendChild(tr);
+
+      const total = entry.ranveer + entry.aman;
+      const share = total / 2;
+
+      if (entry.type === "Expense") {
+        ranveerBalance += entry.ranveer - share;
+        amanBalance += entry.aman - share;
+      } else if (entry.type === "Payment") {
+        ranveerBalance -= entry.ranveer - share;
+        amanBalance -= entry.aman - share;
       }
+    });
+
+    let settlement = '';
+    if (ranveerBalance < 0 && amanBalance > 0) {
+      settlement = `Ranveer will pay Aman $${Math.abs(ranveerBalance).toFixed(2)}`;
+    } else if (amanBalance < 0 && ranveerBalance > 0) {
+      settlement = `Aman will pay Ranveer $${Math.abs(amanBalance).toFixed(2)}`;
+    } else {
+      settlement = `Both are settled equally.`;
     }
 
-    // Replace these with actual user input
-    // login("ranveer@gmail.com", "password123");
-    // addExpense("Ranveer", "2025-05-03", "Office supplies", 25, "Aman");
-    // loadExpenses();
-    // deleteExpense("EXPENSE_ID_HERE");
+    document.getElementById("summaryBox").innerHTML = `
+      <strong>Ranveer Balance:</strong> $${ranveerBalance.toFixed(2)}<br>
+      <strong>Aman Balance:</strong> $${amanBalance.toFixed(2)}<br><br>
+      <strong>Settlement:</strong> ${settlement}
+    `;
+    document.getElementById("currentMonth").innerText = getCurrentMonth();
+  }
 
-  </script>
+  document.getElementById("expenseForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const item = document.getElementById("expenseItem").value;
+    const ranveer = parseFloat(document.getElementById("paidRanveer").value) || 0;
+    const aman = parseFloat(document.getElementById("paidAman").value) || 0;
+    allEntries.push({ type: "Expense", item, ranveer, aman, date: getCurrentDate(), addedBy: currentUser });
+    saveData();
+    this.reset();
+    renderTable();
+  });
+
+  document.getElementById("paymentForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const item = document.getElementById("paymentItem").value;
+    const ranveer = parseFloat(document.getElementById("receivedRanveer").value) || 0;
+    const aman = parseFloat(document.getElementById("receivedAman").value) || 0;
+    allEntries.push({ type: "Payment", item, ranveer, aman, date: getCurrentDate(), addedBy: currentUser });
+    saveData();
+    this.reset();
+    renderTable();
+  });
+</script>
 </body>
 </html>
