@@ -104,8 +104,8 @@
 
   <div id="loginPage">
     <h2>Login to Business Tracker</h2>
-    <input type="text" id="Ranveer@tracker.com" placeholder="Username" required />
-    <input type="password" id="8epoxyResin@@" placeholder="Password" required />
+    <input type="text" id="loginUser" placeholder="Username" required />
+    <input type="password" id="loginPass" placeholder="Password" required />
     <button onclick="login()">Login</button>
     <p id="loginError" style="color:red;"></p>
   </div>
@@ -168,24 +168,11 @@
     </div>
   </div>
 
-<script type="module">
-  // Import the functions you need from Firebase SDK
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
-
-  // Your Firebase configuration
-  const firebaseConfig = {
-    apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
-    authDomain: "epoxyresin-60ea7.firebaseapp.com",
-    projectId: "epoxyresin-60ea7",
-    storageBucket: "epoxyresin-60ea7.firebasestorage.app",
-    messagingSenderId: "591026708184",
-    appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
+<script>
+  const validUsers = {
+    "Ranveer": "8epoxyResin@@",
+    "Aman": "8resinEpoxy@@"
   };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
 
   let currentUser = null;
   let allEntries = [];
@@ -193,24 +180,16 @@
   function login() {
     const user = document.getElementById("loginUser").value.trim();
     const pass = document.getElementById("loginPass").value.trim();
-
-    // Use Firebase to authenticate with email and password
-    signInWithEmailAndPassword(auth, user, pass)
-      .then((userCredential) => {
-        // Signed in 
-        const user = userCredential.user;
-        currentUser = user.email; // Set the email of the logged-in user
-        document.getElementById("loginPage").style.display = "none";
-        document.getElementById("mainApp").style.display = "block";
-        document.getElementById("loggedInUser").innerText = "Logged in as: " + currentUser;
-        loadData();
-        renderTable();
-      })
-      .catch((error) => {
-        const errorCode = error.code;
-        const errorMessage = error.message;
-        document.getElementById("loginError").innerText = "Error: " + errorMessage;
-      });
+    if (validUsers[user] === pass) {
+      currentUser = user;
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("mainApp").style.display = "block";
+      document.getElementById("loggedInUser").innerText = "Logged in as: " + currentUser;
+      loadData();
+      renderTable();
+    } else {
+      document.getElementById("loginError").innerText = "Invalid username or password!";
+    }
   }
 
   function logout() {
@@ -231,18 +210,7 @@
   }
 
   function saveData() {
-    localStorage.setItem("entries", JSON.stringify(allEntries));
-  }
-
-  function loadData() {
-    const data = localStorage.getItem("entries");
-    if (data) {
-      allEntries = JSON.parse(data).map(entry => ({
-        ...entry,
-        ranveer: Number(entry.ranveer),
-        aman: Number(entry.aman)
-      }));
-    }
+    sendTosheet.setItem("entries", JSON.stringify(allEntries));
   }
 
   function exportCSV() {
@@ -265,37 +233,102 @@
       renderTable();
     }
   }
+function sendToSheet(entry) {
+  fetch("PASTE_YOUR_WEB_APP_URL_HERE", {
+    method: "POST",
+    body: JSON.stringify(entry),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  })
+  .then(res => res.json())
+  .then(data => console.log("Saved to Google Sheet:", data))
+  .catch(err => console.error("Error:", err));
+}
 
   function renderTable() {
     const tableBody = document.getElementById("dataTableBody");
     const filter = document.getElementById("entryFilter").value;
+    tableBody.innerHTML = "";
+
+    let ranveerBalance = 0, amanBalance = 0;
     let filteredEntries = [...allEntries];
 
-    if (filter === 'thisMonth') {
-      const currentMonth = getCurrentMonth();
-      filteredEntries = allEntries.filter(entry => new Date(entry.date).toLocaleString('default', { month: 'long', year: 'numeric' }) === currentMonth);
-    } else if (filter === '10') {
+    if (filter === "10") {
       filteredEntries = allEntries.slice(-10);
+    } else if (filter === "thisMonth") {
+      const now = new Date();
+      filteredEntries = allEntries.filter(e => {
+        const date = new Date(e.date);
+        return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+      });
     }
 
-    tableBody.innerHTML = "";
     filteredEntries.forEach((entry, index) => {
-      const row = document.createElement("tr");
-      row.innerHTML = `
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
         <td>${entry.date}</td>
         <td>${entry.type}</td>
         <td>${entry.item}</td>
-        <td>${entry.ranveer}</td>
-        <td>${entry.aman}</td>
+        <td>${entry.ranveer.toFixed(2)}</td>
+        <td>${entry.aman.toFixed(2)}</td>
         <td>${entry.addedBy}</td>
         <td class="action-buttons">
           <button onclick="deleteEntry(${index})">Delete</button>
         </td>
       `;
-      tableBody.appendChild(row);
-    });
-  }
-</script>
+      tableBody.appendChild(tr);
 
+      const total = entry.ranveer + entry.aman;
+      const share = total / 2;
+
+      if (entry.type === "Expense") {
+        ranveerBalance += entry.ranveer - share;
+        amanBalance += entry.aman - share;
+      } else if (entry.type === "Payment") {
+        ranveerBalance -= entry.ranveer - share;
+        amanBalance -= entry.aman - share;
+      }
+    });
+
+    let settlement = '';
+    if (ranveerBalance < 0 && amanBalance > 0) {
+      settlement = `Ranveer will pay Aman $${Math.abs(ranveerBalance).toFixed(2)}`;
+    } else if (amanBalance < 0 && ranveerBalance > 0) {
+      settlement = `Aman will pay Ranveer $${Math.abs(amanBalance).toFixed(2)}`;
+    } else {
+      settlement = `Both are settled equally.`;
+    }
+
+    document.getElementById("summaryBox").innerHTML = `
+      <strong>Ranveer Balance:</strong> $${ranveerBalance.toFixed(2)}<br>
+      <strong>Aman Balance:</strong> $${amanBalance.toFixed(2)}<br><br>
+      <strong>Settlement:</strong> ${settlement}
+    `;
+    document.getElementById("currentMonth").innerText = getCurrentMonth();
+  }
+
+  document.getElementById("expenseForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const item = document.getElementById("expenseItem").value;
+    const ranveer = parseFloat(document.getElementById("paidRanveer").value) || 0;
+    const aman = parseFloat(document.getElementById("paidAman").value) || 0;
+    allEntries.push({ type: "Expense", item, ranveer, aman, date: getCurrentDate(), addedBy: currentUser });
+    saveData();
+    this.reset();
+    renderTable();
+  });
+
+  document.getElementById("paymentForm").addEventListener("submit", function(e) {
+    e.preventDefault();
+    const item = document.getElementById("paymentItem").value;
+    const ranveer = parseFloat(document.getElementById("receivedRanveer").value) || 0;
+    const aman = parseFloat(document.getElementById("receivedAman").value) || 0;
+    allEntries.push({ type: "Payment", item, ranveer, aman, date: getCurrentDate(), addedBy: currentUser });
+    saveData();
+    this.reset();
+    renderTable();
+  });
+</script>
 </body>
 </html>
