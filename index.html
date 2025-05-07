@@ -211,6 +211,23 @@ function sendToSheet(entry) {
   .then(data => console.log("Saved to Google Sheet:", data))
   .catch(err => console.error("Error:", err));
 }
+function doGet(e) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("entries");
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const result = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const row = {};
+    for (let j = 0; j < headers.length; j++) {
+      row[headers[j]] = data[i][j];
+    }
+    result.push(row);
+  }
+
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
   function getCurrentMonth() {
     const now = new Date();
     return now.toLocaleString('default', { month: 'long', year: 'numeric' });
@@ -220,15 +237,22 @@ function sendToSheet(entry) {
     return new Date().toISOString().split("T")[0];
   }
   function loadData() {
-    const data = sendTosheet.getItem("entries");
-    if (data) {
-      allEntries = JSON.parse(data).map(entry => ({
-        ...entry,
+  fetch("https://script.google.com/macros/s/AKfycbyjMf9niUPy3xtd6uwW540NeWATnxh0Z67Op__KVGwKwp_4hv-kjGWrlhxP-UVbUy-W/exec")
+    .then(response => response.json())
+    .then(data => {
+      allEntries = data.map(entry => ({
+        type: entry.type,
+        item: entry.item,
         ranveer: Number(entry.ranveer),
-        aman: Number(entry.aman)
+        aman: Number(entry.aman),
+        date: entry.date,
+        addedBy: entry.addedBy
       }));
-    }
-  }
+      renderTable();
+    })
+    .catch(err => console.error("Error loading data:", err));
+}
+
   function saveData() {
     sendTosheet.setItem("entries", JSON.stringify(allEntries));
   }
