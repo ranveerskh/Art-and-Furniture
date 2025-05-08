@@ -56,6 +56,13 @@
     <h1>Business Tracker</h1>
     <p id="user">Loading...</p>
 
+    <!-- Sort by dropdown -->
+    <label for="sort-option">Sort By</label>
+    <select id="sort-option">
+      <option value="recent">Recent 10 Entries</option>
+      <option value="monthly">This Month's Entries</option>
+    </select>
+
     <form id="expense-form">
       <label for="type">Type</label>
       <select id="type" required>
@@ -114,7 +121,7 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
@@ -136,19 +143,22 @@
     const settlementDiv = document.getElementById("settlement");
     const monthlySummaryDiv = document.getElementById("monthly-summary");
     const yearlySummaryDiv = document.getElementById("yearly-summary");
+    const sortOption = document.getElementById("sort-option");
 
     let currentUser = null;
 
+    // Listen for auth state changes
     onAuthStateChanged(auth, user => {
       if (user) {
         currentUser = user;
         userLabel.textContent = `Logged in as: ${user.email}`;
-        loadLogs();
+        loadLogs(); // Initial load
       } else {
         window.location.href = "/login.html";
       }
     });
 
+    // Handle form submission
     expenseForm.addEventListener("submit", async (e) => {
       e.preventDefault();
 
@@ -173,22 +183,27 @@
       expenseForm.reset();
     });
 
+    // Load logs based on selected sort option
+    sortOption.addEventListener("change", loadLogs);
+
     function loadLogs() {
-      const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
+      const selectedOption = sortOption.value;
+      let q;
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const startOfMonth = new Date(currentYear, currentMonth, 1);
+
+      if (selectedOption === "recent") {
+        // Query for recent 10 entries
+        q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"), limit(10));
+      } else if (selectedOption === "monthly") {
+        // Query for this month's entries
+        q = query(collection(db, "businessLogs"), where("timestamp", ">=", startOfMonth), orderBy("timestamp", "desc"));
+      }
+
       onSnapshot(q, (snapshot) => {
-        logTableBody.innerHTML = "";
-
-        let ranveerBalance = 0;
-        let amanBalance = 0;
-
-        // Profit/loss tracking
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-        let monthlyIncome = 0;
-        let monthlyExpense = 0;
-        let yearlyIncome = 0;
-        let yearlyExpense = 0;
+        logTableBody.innerHTML = ""; // Clear existing rows
 
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
@@ -196,27 +211,6 @@
           const time = data.timestamp?.toDate();
           const formattedTime = time?.toLocaleString() ?? "Unknown";
 
-          // Settlement
-          if (data.type === "Expense") {
-            if (data.addedBy === "Ranveer") amanBalance -= data.amount / 2;
-            else ranveerBalance -= data.amount / 2;
-          } else if (data.type === "Payment") {
-            if (data.addedBy === "Ranveer") amanBalance += data.amount / 2;
-            else ranveerBalance += data.amount / 2;
-          }
-
-          // Monthly/yearly summary
-          if (time && time.getFullYear() === currentYear) {
-            if (data.type === "Expense") yearlyExpense += data.amount;
-            if (data.type === "Payment") yearlyIncome += data.amount;
-
-            if (time.getMonth() === currentMonth) {
-              if (data.type === "Expense") monthlyExpense += data.amount;
-              if (data.type === "Payment") monthlyIncome += data.amount;
-            }
-          }
-
-          // Add row
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${formattedTime}</td>
@@ -231,43 +225,19 @@
           `;
           logTableBody.appendChild(row);
         });
-
-        // Show settlement
-        const balance = ranveerBalance - amanBalance;
-        let message = "";
-        if (balance > 0) {
-          message = `Aman owes Ranveer ₹${Math.abs(balance).toFixed(2)}`;
-        } else if (balance < 0) {
-          message = `Ranveer owes Aman ₹${Math.abs(balance).toFixed(2)}`;
-        } else {
-          message = "All Settled!";
-        }
-        settlementDiv.textContent = message;
-
-        // Monthly and Yearly Summary Output
-        const monthlyProfit = monthlyIncome - monthlyExpense;
-        const yearlyProfit = yearlyIncome - yearlyExpense;
-
-       // Monthly Summary
-const monthlyType = monthlyProfit < 0 ? "Loss" : "Profit";
-monthlySummaryDiv.textContent =
-  `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, ${monthlyType} ₹${Math.abs(monthlyProfit).toFixed(2)}`;
-monthlySummaryDiv.style.backgroundColor = monthlyProfit < 0 ? "#f8d7da" : "#dff0d8";
-
-// Yearly Summary
-const yearlyType = yearlyProfit < 0 ? "Loss" : "Profit";
-yearlySummaryDiv.textContent =
-  `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, ${yearlyType} ₹${Math.abs(yearlyProfit).toFixed(2)}`;
-yearlySummaryDiv.style.backgroundColor = yearlyProfit < 0 ? "#f8d7da" : "#dff0d8";
-
       });
     }
 
+    // Delete an entry
     window.deleteEntry = async function(id) {
       await deleteDoc(doc(db, "businessLogs", id));
     }
 
+    // Logout functionality
     logoutBtn.onclick = () => signOut(auth);
+
+    // Initial load when the page loads
+    window.onload = loadLogs;
   </script>
 </body>
 </html>
