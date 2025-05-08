@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Business Tracker</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       margin: 40px;
       background-color: #f5f5f5;
     }
     .container {
-      max-width: 1000px;
+      max-width: 800px;
       margin: auto;
       background: white;
       padding: 20px;
@@ -21,33 +22,15 @@
     h1, h2 {
       text-align: center;
     }
-    table {
-      width: 100%;
-      margin-top: 20px;
-    }
-    th, td {
-      text-align: left;
-      padding: 8px;
-    }
-    th {
-      background-color: #efefef;
-    }
-    button {
-      background-color: #3498db;
-      color: white;
-      border: none;
-      padding: 6px 10px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #2980b9;
-    }
-    .settlement {
-      background-color: #dff0d8;
+    #log-list li {
+      margin-bottom: 10px;
+      background: #f1f1f1;
       padding: 10px;
-      margin-top: 20px;
       border-radius: 5px;
+    }
+    #chart-container {
+      margin: 30px 0;
+      height: 400px;
     }
   </style>
 </head>
@@ -55,7 +38,6 @@
   <div class="container">
     <h1>Business Tracker</h1>
     <p id="user">Loading...</p>
-
     <form id="expense-form">
       <label for="type">Type</label>
       <select id="type" required>
@@ -84,25 +66,29 @@
       <button type="submit">Submit Log</button>
     </form>
 
-    <div class="settlement" id="settlement">Calculating settlement...</div>
+    <h2>Activity Logs</h2>
+    <ul id="log-list"></ul>
 
-    <h2>Activity Log</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Date/Time</th>
-          <th>Type</th>
-          <th>Item</th>
-          <th>Number</th>
-          <th>Amount</th>
-          <th>Description</th>
-          <th>Paid By</th>
-          <th>Added By</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="log-table-body"></tbody>
-    </table>
+    <h2>Expense/Payment Chart</h2>
+    <div id="chart-container">
+      <canvas id="chart"></canvas>
+    </div>
+
+    <label for="month-select">Select Month</label>
+    <select id="month-select">
+      <option value="01">January</option>
+      <option value="02">February</option>
+      <option value="03">March</option>
+      <option value="04">April</option>
+      <option value="05">May</option>
+      <option value="06">June</option>
+      <option value="07">July</option>
+      <option value="08">August</option>
+      <option value="09">September</option>
+      <option value="10">October</option>
+      <option value="11">November</option>
+      <option value="12">December</option>
+    </select>
 
     <button id="logout">Logout</button>
   </div>
@@ -110,13 +96,13 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
       authDomain: "epoxyresin-60ea7.firebaseapp.com",
       projectId: "epoxyresin-60ea7",
-      storageBucket: "epoxyresin-60ea7.appspot.com",
+      storageBucket: "epoxyresin-60ea7.firebasestorage.app",
       messagingSenderId: "591026708184",
       appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
     };
@@ -127,11 +113,13 @@
 
     const userLabel = document.getElementById("user");
     const expenseForm = document.getElementById("expense-form");
-    const logTableBody = document.getElementById("log-table-body");
+    const logList = document.getElementById("log-list");
     const logoutBtn = document.getElementById("logout");
-    const settlementDiv = document.getElementById("settlement");
+    const monthSelect = document.getElementById("month-select");
+    const chartCanvas = document.getElementById("chart");
 
     let currentUser = null;
+    let allLogs = [];
 
     onAuthStateChanged(auth, user => {
       if (user) {
@@ -160,7 +148,6 @@
         amount,
         description,
         addedBy,
-        user: currentUser.email.includes("ranveer") ? "Ranveer" : "Aman",
         timestamp: serverTimestamp()
       });
 
@@ -170,67 +157,64 @@
     function loadLogs() {
       const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
       onSnapshot(q, (snapshot) => {
-        logTableBody.innerHTML = "";
-
-        let ranveerBalance = 0;
-        let amanBalance = 0;
-
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          const id = docSnap.id;
-          const time = data.timestamp?.toDate().toLocaleString() ?? "Unknown";
-
-          // Settlement Calculation
-          if (data.type === "Expense") {
-            if (data.addedBy === "Ranveer") {
-              amanBalance -= data.amount / 2;
-            } else {
-              ranveerBalance -= data.amount / 2;
-            }
-          } else if (data.type === "Payment") {
-            if (data.addedBy === "Ranveer") {
-              amanBalance += data.amount / 2;
-            } else {
-              ranveerBalance += data.amount / 2;
-            }
-          }
-
-          // Add row
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${time}</td>
-            <td>${data.type}</td>
-            <td>${data.itemName}</td>
-            <td>${data.itemNumber}</td>
-            <td>$${data.amount.toFixed(2)}</td>
-            <td>${data.description}</td>
-            <td>${data.user}</td>
-            <td>${data.addedBy}</td>
-            <td><button onclick="deleteEntry('${id}')">Delete</button></td>
-          `;
-          logTableBody.appendChild(row);
+        logList.innerHTML = "";
+        allLogs = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const li = document.createElement("li");
+          const time = data.timestamp?.toDate().toLocaleString() ?? "Unknown time";
+          li.innerHTML = `<strong>${time}</strong><br>
+            <em>${data.user}</em> added a <strong>${data.type}</strong><br>
+            Item: ${data.itemName} (#${data.itemNumber})<br>
+            Amount: $${data.amount}<br>
+            Description: ${data.description}<br>
+            Added by: ${data.addedBy}`;
+          logList.appendChild(li);
+          allLogs.push(data);
         });
 
-        const balance = ranveerBalance - amanBalance;
-
-        let message = "";
-        if (balance > 0) {
-          message = `Aman owes Ranveer ₹${Math.abs(balance).toFixed(2)}`;
-        } else if (balance < 0) {
-          message = `Ranveer owes Aman ₹${Math.abs(balance).toFixed(2)}`;
-        } else {
-          message = "All Settled!";
-        }
-
-        settlementDiv.textContent = message;
+        updateChart();
       });
     }
 
-    window.deleteEntry = async function(id) {
-      await deleteDoc(doc(db, "businessLogs", id));
+    function updateChart() {
+      const selectedMonth = monthSelect.value;
+      const filteredLogs = allLogs.filter(log => log.timestamp?.toDate().getMonth() + 1 === parseInt(selectedMonth));
+      
+      let expenseTotal = 0;
+      let paymentTotal = 0;
+      
+      filteredLogs.forEach(log => {
+        if (log.type === "Expense") expenseTotal += log.amount;
+        if (log.type === "Payment") paymentTotal += log.amount;
+      });
+
+      const chartData = {
+        labels: ['Expenses', 'Payments'],
+        datasets: [{
+          data: [expenseTotal, paymentTotal],
+          backgroundColor: ['red', 'green'],
+        }]
+      };
+
+      const chartConfig = {
+        type: 'pie',
+        data: chartData,
+        options: {
+          responsive: true,
+        }
+      };
+
+      if (window.chartInstance) {
+        window.chartInstance.destroy();
+      }
+
+      window.chartInstance = new Chart(chartCanvas, chartConfig);
     }
 
     logoutBtn.onclick = () => signOut(auth);
+
+    monthSelect.addEventListener('change', updateChart);
   </script>
 </body>
 </html>
