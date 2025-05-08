@@ -66,20 +66,22 @@
     const loginForm = document.getElementById("login-form");
     const errorMessage = document.getElementById("error-message");
 
-    loginForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("email").value.trim();
-      const password = document.getElementById("password").value;
+   loginForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const email = document.getElementById("email").value.trim();
+  const password = document.getElementById("password").value;
 
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        window.location.href = "/index.html";
-      } catch (error) {
-        console.error("Login error:", error);
-        errorMessage.textContent = "Login failed: " + error.message;
-        errorMessage.style.display = "block";
-      }
-    });
+  try {
+    console.log("Trying to sign in...");
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    console.log("Signed in:", userCredential.user);
+    window.location.href = "/index.html";
+  } catch (error) {
+    console.error("Login error:", error);
+    errorMessage.textContent = "Login failed: " + error.message;
+    errorMessage.style.display = "block";
+  }
+});
   </script>
 </body>
 </html>
