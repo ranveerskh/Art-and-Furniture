@@ -87,8 +87,6 @@
     <div class="settlement" id="settlement">Calculating settlement...</div>
 
     <h2>Activity Log</h2>
-    <button id="sort-by-10-days">Sort by Last 10 Days</button>
-    <button id="sort-by-month">Sort by Monthly</button>
     <table>
       <thead>
         <tr>
@@ -111,6 +109,7 @@
     <div class="settlement" id="yearly-summary">Loading yearly summary...</div>
 
     <button id="logout">Logout</button>
+    <button id="export-monthly">Export Monthly CSV</button>
   </div>
 
   <script type="module">
@@ -138,11 +137,10 @@
     const settlementDiv = document.getElementById("settlement");
     const monthlySummaryDiv = document.getElementById("monthly-summary");
     const yearlySummaryDiv = document.getElementById("yearly-summary");
-    const sortBy10DaysBtn = document.getElementById("sort-by-10-days");
-    const sortByMonthBtn = document.getElementById("sort-by-month");
+    const exportMonthlyBtn = document.getElementById("export-monthly");
 
     let currentUser = null;
-    let logsSnapshot = null;
+    let monthlyLogs = [];
 
     onAuthStateChanged(auth, user => {
       if (user) {
@@ -181,126 +179,128 @@
     function loadLogs() {
       const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
       onSnapshot(q, (snapshot) => {
-        logsSnapshot = snapshot;
-        displayLogs(snapshot);
-      });
-    }
+        logTableBody.innerHTML = "";
+        monthlyLogs = []; // Reset the logs for monthly export
 
-    function displayLogs(snapshot) {
-      logTableBody.innerHTML = "";
+        let ranveerBalance = 0;
+        let amanBalance = 0;
 
-      let ranveerBalance = 0;
-      let amanBalance = 0;
+        // Profit/loss tracking
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        let monthlyIncome = 0;
+        let monthlyExpense = 0;
+        let yearlyIncome = 0;
+        let yearlyExpense = 0;
 
-      // Profit/loss tracking
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-      let monthlyIncome = 0;
-      let monthlyExpense = 0;
-      let yearlyIncome = 0;
-      let yearlyExpense = 0;
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const id = docSnap.id;
+          const time = data.timestamp?.toDate();
+          const formattedTime = time?.toLocaleString() ?? "Unknown";
 
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const id = docSnap.id;
-        const time = data.timestamp?.toDate();
-        const formattedTime = time?.toLocaleString() ?? "Unknown";
-
-        // Settlement
-        if (data.type === "Expense") {
-          if (data.addedBy === "Ranveer") amanBalance -= data.amount / 2;
-          else ranveerBalance -= data.amount / 2;
-        } else if (data.type === "Payment") {
-          if (data.addedBy === "Ranveer") amanBalance += data.amount / 2;
-          else ranveerBalance += data.amount / 2;
-        }
-
-        // Monthly/yearly summary
-        if (time && time.getFullYear() === currentYear) {
-          if (data.type === "Expense") yearlyExpense += data.amount;
-          if (data.type === "Payment") yearlyIncome += data.amount;
-
-          if (time.getMonth() === currentMonth) {
-            if (data.type === "Expense") monthlyExpense += data.amount;
-            if (data.type === "Payment") monthlyIncome += data.amount;
+          // Settlement
+          if (data.type === "Expense") {
+            if (data.addedBy === "Ranveer") amanBalance -= data.amount / 2;
+            else ranveerBalance -= data.amount / 2;
+          } else if (data.type === "Payment") {
+            if (data.addedBy === "Ranveer") amanBalance += data.amount / 2;
+            else ranveerBalance += data.amount / 2;
           }
-        }
 
-        // Add row
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${formattedTime}</td>
-          <td>${data.type}</td>
-          <td>${data.itemName}</td>
-          <td>${data.itemNumber}</td>
-          <td>₹${data.amount.toFixed(2)}</td>
-          <td>${data.description}</td>
-          <td>${data.user}</td>
-          <td>${data.addedBy}</td>
-          <td><button onclick="deleteEntry('${id}')">Delete</button></td>
-        `;
-        logTableBody.appendChild(row);
+          // Monthly/yearly summary
+          if (time && time.getFullYear() === currentYear) {
+            if (data.type === "Expense") yearlyExpense += data.amount;
+            if (data.type === "Payment") yearlyIncome += data.amount;
+
+            if (time.getMonth() === currentMonth) {
+              if (data.type === "Expense") monthlyExpense += data.amount;
+              if (data.type === "Payment") monthlyIncome += data.amount;
+              monthlyLogs.push(data); // Add to the monthly logs
+            }
+          }
+
+          // Add row
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${formattedTime}</td>
+            <td>${data.type}</td>
+            <td>${data.itemName}</td>
+            <td>${data.itemNumber}</td>
+            <td>₹${data.amount.toFixed(2)}</td>
+            <td>${data.description}</td>
+            <td>${data.user}</td>
+            <td>${data.addedBy}</td>
+            <td><button onclick="deleteEntry('${id}')">Delete</button></td>
+          `;
+          logTableBody.appendChild(row);
+        });
+
+        // Show settlement
+        const balance = ranveerBalance - amanBalance;
+        let message = "";
+        if (balance > 0) {
+          message = `Aman owes Ranveer ₹${Math.abs(balance).toFixed(2)}`;
+        } else if (balance < 0) {
+          message = `Ranveer owes Aman ₹${Math.abs(balance).toFixed(2)}`;
+        } else {
+          message = "All Settled!";
+        }
+        settlementDiv.textContent = message;
+
+        // Monthly and Yearly Summary Output
+        const monthlyProfit = monthlyIncome - monthlyExpense;
+        const yearlyProfit = yearlyIncome - yearlyExpense;
+
+        // Monthly Summary
+        const monthlyType = monthlyProfit < 0 ? "Loss" : "Profit";
+        monthlySummaryDiv.textContent =
+          `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, ${monthlyType} ₹${Math.abs(monthlyProfit).toFixed(2)}`;
+        monthlySummaryDiv.style.backgroundColor = monthlyProfit < 0 ? "#f8d7da" : "#dff0d8";
+
+        // Yearly Summary
+        const yearlyType = yearlyProfit < 0 ? "Loss" : "Profit";
+        yearlySummaryDiv.textContent =
+          `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, ${yearlyType} ₹${Math.abs(yearlyProfit).toFixed(2)}`;
+        yearlySummaryDiv.style.backgroundColor = yearlyProfit < 0 ? "#f8d7da" : "#dff0d8";
+      });
+    }
+
+    function exportCSV(data) {
+      const headers = ["Date/Time", "Type", "Item", "Number", "Amount", "Description", "Paid By", "Added By"];
+      const rows = data.map(d => [
+        d.timestamp?.toDate().toLocaleString() ?? "Unknown",
+        d.type,
+        d.itemName,
+        d.itemNumber,
+        `₹${d.amount.toFixed(2)}`,
+        d.description,
+        d.user,
+        d.addedBy
+      ]);
+
+      let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+      rows.forEach(row => {
+        csvContent += row.join(",") + "\n";
       });
 
-      // Show settlement
-      const balance = ranveerBalance - amanBalance;
-      let message = "";
-      if (balance > 0) {
-        message = `Aman owes Ranveer ₹${Math.abs(balance).toFixed(2)}`;
-      } else if (balance < 0) {
-        message = `Ranveer owes Aman ₹${Math.abs(balance).toFixed(2)}`;
-      } else {
-        message = "All Settled!";
-      }
-      settlementDiv.textContent = message;
-
-      // Monthly and Yearly Summary Output
-      const monthlyProfit = monthlyIncome - monthlyExpense;
-      const yearlyProfit = yearlyIncome - yearlyExpense;
-
-      // Monthly Summary
-      const monthlyType = monthlyProfit < 0 ? "Loss" : "Profit";
-      monthlySummaryDiv.textContent =
-        `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, ${monthlyType} ₹${Math.abs(monthlyProfit).toFixed(2)}`;
-      monthlySummaryDiv.style.backgroundColor = monthlyProfit < 0 ? "#f8d7da" : "#dff0d8";
-
-      // Yearly Summary
-      const yearlyType = yearlyProfit < 0 ? "Loss" : "Profit";
-      yearlySummaryDiv.textContent =
-        `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, ${yearlyType} ₹${Math.abs(yearlyProfit).toFixed(2)}`;
-      yearlySummaryDiv.style.backgroundColor = yearlyProfit < 0 ? "#f8d7da" : "#dff0d8";
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "monthly_logs.csv");
+      link.click();
     }
+
+    exportMonthlyBtn.onclick = () => {
+      exportCSV(monthlyLogs);
+    };
 
     window.deleteEntry = async function(id) {
       await deleteDoc(doc(db, "businessLogs", id));
     }
 
     logoutBtn.onclick = () => signOut(auth);
-
-    sortBy10DaysBtn.onclick = () => filterLogsByPeriod(10);
-    sortByMonthBtn.onclick = () => filterLogsByMonth();
-
-    function filterLogsByPeriod(days) {
-      const periodStart = new Date();
-      periodStart.setDate(periodStart.getDate() - days);
-      const filteredLogs = logsSnapshot.docs.filter(docSnap => {
-        const time = docSnap.data().timestamp?.toDate();
-        return time && time >= periodStart;
-      });
-      displayLogs({ docs: filteredLogs });
-    }
-
-    function filterLogsByMonth() {
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-      const filteredLogs = logsSnapshot.docs.filter(docSnap => {
-        const time = docSnap.data().timestamp?.toDate();
-        return time && time.getFullYear() === currentYear && time.getMonth() === currentMonth;
-      });
-      displayLogs({ docs: filteredLogs });
-    }
   </script>
 </body>
 </html>
