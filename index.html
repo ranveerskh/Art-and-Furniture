@@ -215,11 +215,24 @@
       });
 
       // Show settlement
-      if (ranveerBalance > amanBalance) {
-        settlementDiv.textContent = `💰 Current Settlement: Aman owes Ranveer $${(ranveerBalance - amanBalance).toFixed(2)}`;
-      } else if (amanBalance > ranveerBalance) {
-        settlementDiv.textContent = `💰 Current Settlement: Ranveer owes Aman $${(amanBalance - ranveerBalance).toFixed(2)}`;
-      } else {
+     if (data.type === "Expense") {
+  if (data.addedBy === "Ranveer") {
+    // Aman owes Ranveer 50%
+    amanBalance -= data.amount / 2;
+  } else {
+    // Ranveer owes Aman 50%
+    ranveerBalance -= data.amount / 2;
+  }
+} else if (data.type === "Payment") {
+  if (data.addedBy === "Ranveer") {
+    // Ranveer receives 50% for Aman → he needs to give Aman back
+    amanBalance += data.amount / 2;
+  } else {
+    // Aman receives 50% for Ranveer
+    ranveerBalance += data.amount / 2;
+  }
+}
+ else {
         settlementDiv.textContent = `✅ Both are settled equally.`;
       }
 
