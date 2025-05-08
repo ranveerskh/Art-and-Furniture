@@ -4,222 +4,144 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Business Tracker</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css" />
   <style>
     body {
-      margin: 40px;
-      background-color: #f5f5f5;
+      font-family: Arial, sans-serif;
+      margin: 20px;
     }
-    .container {
-      max-width: 1000px;
-      margin: auto;
-      background: white;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    .loss {
+      background-color: #ffd6d6;
     }
-    h1, h2 {
-      text-align: center;
+    .profit {
+      background-color: #d6ffd6;
     }
     table {
       width: 100%;
-      margin-top: 20px;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    table, th, td {
+      border: 1px solid #ccc;
     }
     th, td {
-      text-align: left;
       padding: 8px;
+      text-align: left;
     }
-    th {
-      background-color: #efefef;
-    }
-    button {
-      background-color: #3498db;
-      color: white;
-      border: none;
-      padding: 6px 10px;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #2980b9;
-    }
-    .settlement {
-      background-color: #dff0d8;
-      padding: 10px;
-      margin-top: 20px;
-      border-radius: 5px;
+    select {
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Business Tracker</h1>
-    <p id="user">Loading...</p>
 
-    <form id="expense-form">
-      <label for="type">Type</label>
-      <select id="type" required>
-        <option value="Expense">Expense</option>
-        <option value="Payment">Payment</option>
-      </select>
+  <h1>Business Tracker</h1>
 
-      <label for="item-name">Item Name</label>
-      <input type="text" id="item-name" required>
+  <label for="filter">Filter Activity Log:</label>
+  <select id="filter">
+    <option value="all">All</option>
+    <option value="last10days">Last 10 Days</option>
+    <option value="monthly">This Month</option>
+    <option value="expenses">Only Expenses</option>
+    <option value="payments">Only Payments</option>
+  </select>
 
-      <label for="item-number">Item Number</label>
-      <input type="text" id="item-number" required>
+  <h2>Activity Log</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Item Name</th>
+        <th>Item Number</th>
+        <th>Amount</th>
+        <th>Description</th>
+        <th>User</th>
+        <th>Added By</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="logTableBody"></tbody>
+  </table>
 
-      <label for="amount">Amount</label>
-      <input type="number" id="amount" required>
+  <h3 id="settlementDiv"></h3>
+  <div id="monthlyProfit"></div>
+  <div id="yearlyProfit"></div>
 
-      <label for="description">Description</label>
-      <input type="text" id="description" required>
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
 
-      <label for="added-by">Added By</label>
-      <select id="added-by" required>
-        <option value="Ranveer">Ranveer</option>
-        <option value="Aman">Aman</option>
-      </select>
-
-      <button type="submit">Submit Log</button>
-    </form>
-
-    <div class="settlement" id="settlement">Calculating settlement...</div>
-
-    <h2>Activity Log</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Date/Time</th>
-          <th>Type</th>
-          <th>Item</th>
-          <th>Number</th>
-          <th>Amount</th>
-          <th>Description</th>
-          <th>Paid By</th>
-          <th>Added By</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="log-table-body"></tbody>
-    </table>
-
-    <h2>Monthly & Yearly Summary</h2>
-    <div class="settlement" id="monthly-summary">Loading monthly summary...</div>
-    <div class="settlement" id="yearly-summary">Loading yearly summary...</div>
-
-    <button id="logout">Logout</button>
-  </div>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
+  <script>
+    // Your Firebase configuration
     const firebaseConfig = {
-      apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
-      authDomain: "epoxyresin-60ea7.firebaseapp.com",
-      projectId: "epoxyresin-60ea7",
-      storageBucket: "epoxyresin-60ea7.appspot.com",
-      messagingSenderId: "591026708184",
-      appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
+      apiKey: "AIzaSyCUv0HLUP3bto3U8R4a7tcvKwVOr1MQLd0",
+      authDomain: "business-tracker-2a0b1.firebaseapp.com",
+      projectId: "business-tracker-2a0b1",
+      storageBucket: "business-tracker-2a0b1.appspot.com",
+      messagingSenderId: "334405601689",
+      appId: "1:334405601689:web:46a847d394c1c7f145d1a2"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    const userLabel = document.getElementById("user");
-    const expenseForm = document.getElementById("expense-form");
-    const logTableBody = document.getElementById("log-table-body");
-    const logoutBtn = document.getElementById("logout");
-    const settlementDiv = document.getElementById("settlement");
-    const monthlySummaryDiv = document.getElementById("monthly-summary");
-    const yearlySummaryDiv = document.getElementById("yearly-summary");
-
-    let currentUser = null;
-
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        currentUser = user;
-        userLabel.textContent = `Logged in as: ${user.email}`;
-        loadLogs();
-      } else {
-        window.location.href = "/login.html";
-      }
-    });
-
-    expenseForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const type = document.getElementById("type").value;
-      const itemName = document.getElementById("item-name").value;
-      const itemNumber = document.getElementById("item-number").value;
-      const amount = parseFloat(document.getElementById("amount").value);
-      const description = document.getElementById("description").value;
-      const addedBy = document.getElementById("added-by").value;
-
-      await addDoc(collection(db, "businessLogs"), {
-        type,
-        itemName,
-        itemNumber,
-        amount,
-        description,
-        addedBy,
-        user: currentUser.email.includes("ranveer") ? "Ranveer" : "Aman",
-        timestamp: serverTimestamp()
-      });
-
-      expenseForm.reset();
-    });
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const logTableBody = document.getElementById("logTableBody");
+    const settlementDiv = document.getElementById("settlementDiv");
+    const monthlyProfitDiv = document.getElementById("monthlyProfit");
+    const yearlyProfitDiv = document.getElementById("yearlyProfit");
 
     function loadLogs() {
-      const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
-      onSnapshot(q, (snapshot) => {
-        logTableBody.innerHTML = "";
+      const q = db.collection("businessLogs").orderBy("timestamp", "desc");
+      const selectedFilter = document.getElementById("filter").value;
 
+      q.onSnapshot((snapshot) => {
+        logTableBody.innerHTML = "";
         let ranveerBalance = 0;
         let amanBalance = 0;
+        let monthlyProfit = 0;
+        let yearlyProfit = 0;
 
-        // Profit/loss tracking
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
-        let monthlyIncome = 0;
-        let monthlyExpense = 0;
-        let yearlyIncome = 0;
-        let yearlyExpense = 0;
 
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
           const id = docSnap.id;
-          const time = data.timestamp?.toDate();
-          const formattedTime = time?.toLocaleString() ?? "Unknown";
+          const date = data.timestamp?.toDate();
+          const time = date?.toLocaleString() ?? "Unknown";
 
-          // Settlement
+          // Filter logic
+          if (selectedFilter === "last10days" && date) {
+            const tenDaysAgo = new Date();
+            tenDaysAgo.setDate(now.getDate() - 10);
+            if (date < tenDaysAgo) return;
+          }
+
+          if (selectedFilter === "monthly" && date) {
+            if (date.getMonth() !== currentMonth || date.getFullYear() !== currentYear) return;
+          }
+
+          if (selectedFilter === "expenses" && data.type !== "Expense") return;
+          if (selectedFilter === "payments" && data.type !== "Payment") return;
+
+          // Balance logic
           if (data.type === "Expense") {
             if (data.addedBy === "Ranveer") amanBalance -= data.amount / 2;
             else ranveerBalance -= data.amount / 2;
+
+            if (date.getMonth() === currentMonth) monthlyProfit -= data.amount;
+            if (date.getFullYear() === currentYear) yearlyProfit -= data.amount;
           } else if (data.type === "Payment") {
             if (data.addedBy === "Ranveer") amanBalance += data.amount / 2;
             else ranveerBalance += data.amount / 2;
+
+            if (date.getMonth() === currentMonth) monthlyProfit += data.amount;
+            if (date.getFullYear() === currentYear) yearlyProfit += data.amount;
           }
 
-          // Monthly/yearly summary
-          if (time && time.getFullYear() === currentYear) {
-            if (data.type === "Expense") yearlyExpense += data.amount;
-            if (data.type === "Payment") yearlyIncome += data.amount;
-
-            if (time.getMonth() === currentMonth) {
-              if (data.type === "Expense") monthlyExpense += data.amount;
-              if (data.type === "Payment") monthlyIncome += data.amount;
-            }
-          }
-
-          // Add row
           const row = document.createElement("tr");
           row.innerHTML = `
-            <td>${formattedTime}</td>
+            <td>${time}</td>
             <td>${data.type}</td>
             <td>${data.itemName}</td>
             <td>${data.itemNumber}</td>
@@ -232,42 +154,28 @@
           logTableBody.appendChild(row);
         });
 
-        // Show settlement
+        // Show Settlement
         const balance = ranveerBalance - amanBalance;
         let message = "";
-        if (balance > 0) {
-          message = `Aman owes Ranveer ₹${Math.abs(balance).toFixed(2)}`;
-        } else if (balance < 0) {
-          message = `Ranveer owes Aman ₹${Math.abs(balance).toFixed(2)}`;
-        } else {
-          message = "All Settled!";
-        }
+        if (balance > 0) message = `Aman owes Ranveer ₹${Math.abs(balance).toFixed(2)}`;
+        else if (balance < 0) message = `Ranveer owes Aman ₹${Math.abs(balance).toFixed(2)}`;
+        else message = "All Settled!";
         settlementDiv.textContent = message;
 
-        // Monthly and Yearly Summary Output
-        const monthlyProfit = monthlyIncome - monthlyExpense;
-        const yearlyProfit = yearlyIncome - yearlyExpense;
-
-       // Monthly Summary
-const monthlyType = monthlyProfit < 0 ? "Loss" : "Profit";
-monthlySummaryDiv.textContent =
-  `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, ${monthlyType} ₹${Math.abs(monthlyProfit).toFixed(2)}`;
-monthlySummaryDiv.style.backgroundColor = monthlyProfit < 0 ? "#f8d7da" : "#dff0d8";
-
-// Yearly Summary
-const yearlyType = yearlyProfit < 0 ? "Loss" : "Profit";
-yearlySummaryDiv.textContent =
-  `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, ${yearlyType} ₹${Math.abs(yearlyProfit).toFixed(2)}`;
-yearlySummaryDiv.style.backgroundColor = yearlyProfit < 0 ? "#f8d7da" : "#dff0d8";
-
+        // Show Monthly and Yearly Profit/Loss
+        monthlyProfitDiv.innerHTML = `<h3 class="${monthlyProfit < 0 ? 'loss' : 'profit'}">Monthly ${monthlyProfit < 0 ? 'Loss' : 'Profit'}: ₹${Math.abs(monthlyProfit).toFixed(2)}</h3>`;
+        yearlyProfitDiv.innerHTML = `<h3 class="${yearlyProfit < 0 ? 'loss' : 'profit'}">Yearly ${yearlyProfit < 0 ? 'Loss' : 'Profit'}: ₹${Math.abs(yearlyProfit).toFixed(2)}</h3>`;
       });
     }
 
-    window.deleteEntry = async function(id) {
-      await deleteDoc(doc(db, "businessLogs", id));
+    function deleteEntry(id) {
+      if (confirm("Are you sure you want to delete this entry?")) {
+        db.collection("businessLogs").doc(id).delete();
+      }
     }
 
-    logoutBtn.onclick = () => signOut(auth);
+    document.getElementById("filter").addEventListener("change", loadLogs);
+    loadLogs(); // Initial load
   </script>
 </body>
 </html>
