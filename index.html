@@ -36,6 +36,21 @@
     canvas {
       margin-top: 20px;
     }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -58,6 +73,7 @@
     const userLabel = document.getElementById("user");
     const expenseForm = document.getElementById("expense-form");
     const logoutBtn = document.getElementById("logout");
+    const tableBody = document.getElementById("table-body");
 
     let currentUser = null;
     const activityChartCtx = document.getElementById("activity-chart").getContext("2d");
@@ -102,9 +118,25 @@
       const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
       onSnapshot(q, (snapshot) => {
         const activityData = { Expense: 0, Payment: 0 }; // Counts for each type
+        tableBody.innerHTML = ""; // Clear existing table rows
         snapshot.forEach((doc) => {
           const data = doc.data();
+          const time = data.timestamp?.toDate().toLocaleString() ?? "Unknown time";
           const type = data.type;
+          const user = data.user;
+          const addedBy = data.addedBy;
+
+          // Add log to table
+          const row = document.createElement("tr");
+          row.innerHTML = `
+            <td>${time}</td>
+            <td>${data.itemName}</td>
+            <td>${data.itemNumber}</td>
+            <td>${user}</td>
+            <td>${addedBy}</td>
+          `;
+          tableBody.appendChild(row);
+
           if (type === "Expense") {
             activityData.Expense++;
           } else if (type === "Payment") {
@@ -180,6 +212,20 @@
 
     <h2>Recent Activity</h2>
     <canvas id="activity-chart"></canvas>
+
+    <h2>Activity Spreadsheet</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Date/Time</th>
+          <th>Item Name</th>
+          <th>Item Number</th>
+          <th>Who Paid</th>
+          <th>Added By</th>
+        </tr>
+      </thead>
+      <tbody id="table-body"></tbody>
+    </table>
 
     <button id="logout">Logout</button>
   </div>
