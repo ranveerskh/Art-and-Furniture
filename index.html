@@ -5,251 +5,235 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Business Tracker</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       margin: 40px;
       background-color: #f5f5f5;
     }
     .container {
-      max-width: 800px;
+      max-width: 1000px;
       margin: auto;
       background: white;
       padding: 20px;
       border-radius: 8px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
-    h1, h2 {
-      text-align: center;
-    }
-    button {
-      background-color: #4CAF50; /* Green button */
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      cursor: pointer;
-      border-radius: 5px;
-    }
-    button:hover {
-      background-color: #45a049;
-    }
-    canvas {
-      margin-top: 20px;
-    }
     table {
       width: 100%;
       margin-top: 20px;
       border-collapse: collapse;
     }
-    table, th, td {
-      border: 1px solid #ddd;
-    }
     th, td {
-      padding: 8px;
-      text-align: left;
+      padding: 8px 10px;
+      border-bottom: 1px solid #ddd;
     }
     th {
-      background-color: #f2f2f2;
+      background: #f1f1f1;
     }
     .delete-btn {
-      background-color: #f44336; /* Red button for delete */
+      background-color: #777;
       color: white;
       border: none;
       padding: 5px 10px;
-      cursor: pointer;
       border-radius: 5px;
+      cursor: pointer;
     }
-    .delete-btn:hover {
-      background-color: #d32f2f;
+    .settlement-card {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #e8f9e9;
+      border-left: 5px solid green;
+      border-radius: 5px;
+      font-weight: bold;
     }
   </style>
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
-      authDomain: "epoxyresin-60ea7.firebaseapp.com",
-      projectId: "epoxyresin-60ea7",
-      storageBucket: "epoxyresin-60ea7.firebasestorage.app",
-      messagingSenderId: "591026708184",
-      appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    const userLabel = document.getElementById("user");
-    const expenseForm = document.getElementById("expense-form");
-    const logoutBtn = document.getElementById("logout");
-    const tableBody = document.getElementById("table-body");
-
-    let currentUser = null;
-    const activityChartCtx = document.getElementById("activity-chart").getContext("2d");
-    let activityChart = null;
-
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        currentUser = user;
-        userLabel.textContent = `Logged in as: ${user.email}`;
-        loadLogs();
-      } else {
-        window.location.href = "/login.html";
-      }
-    });
-
-    expenseForm.addEventListener("submit", async (e) => {
-      e.preventDefault();
-
-      const type = document.getElementById("type").value;
-      const itemName = document.getElementById("item-name").value;
-      const itemNumber = document.getElementById("item-number").value;
-      const amount = parseFloat(document.getElementById("amount").value);
-      const description = document.getElementById("description").value;
-      const addedBy = document.getElementById("added-by").value;
-      const userName = currentUser.email.includes("ranveer") ? "Ranveer" : "Aman";
-
-      await addDoc(collection(db, "businessLogs"), {
-        type,
-        itemName,
-        itemNumber,
-        amount,
-        description,
-        addedBy,
-        user: userName,
-        timestamp: serverTimestamp()
-      });
-
-      expenseForm.reset();
-    });
-
-    function loadLogs() {
-      const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
-      onSnapshot(q, (snapshot) => {
-        const activityData = { Expense: 0, Payment: 0 }; // Counts for each type
-        tableBody.innerHTML = ""; // Clear existing table rows
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          const time = data.timestamp?.toDate().toLocaleString() ?? "Unknown time";
-          const type = data.type;
-          const user = data.user;
-          const addedBy = data.addedBy;
-
-          // Add log to table
-          const row = document.createElement("tr");
-          row.setAttribute("data-id", doc.id); // Store doc ID for delete action
-          row.innerHTML = `
-            <td>${time}</td>
-            <td>${data.itemName}</td>
-            <td>${data.itemNumber}</td>
-            <td>${user}</td>
-            <td>${addedBy}</td>
-            <td>$${data.amount}</td>
-            <td><button class="delete-btn" onclick="deleteLog('${doc.id}')">Delete</button></td>
-          `;
-          tableBody.appendChild(row);
-
-          if (type === "Expense") {
-            activityData.Expense++;
-          } else if (type === "Payment") {
-            activityData.Payment++;
-          }
-        });
-
-        updateActivityChart(activityData);
-      });
-    }
-
-    function updateActivityChart(activityData) {
-      if (activityChart) {
-        activityChart.destroy();
-      }
-
-      activityChart = new Chart(activityChartCtx, {
-        type: 'bar',
-        data: {
-          labels: ['Expense', 'Payment'],
-          datasets: [{
-            label: 'Recent Activity',
-            data: [activityData.Expense, activityData.Payment],
-            backgroundColor: ['#FF5733', '#33FF57'],
-            borderColor: ['#FF5733', '#33FF57'],
-            borderWidth: 1
-          }]
-        },
-        options: {
-          scales: {
-            y: {
-              beginAtZero: true
-            }
-          }
-        }
-      });
-    }
-
-    window.deleteLog = async function(docId) {
-  const docRef = doc(db, "businessLogs", docId);
-  await deleteDoc(docRef);
-};
-
-
-    logoutBtn.onclick = () => signOut(auth);
-  </script>
 </head>
 <body>
-  <div class="container">
-    <h1>Business Tracker</h1>
-    <p id="user">Loading...</p>
-    <form id="expense-form">
-      <label for="type">Type</label>
-      <select id="type" required>
-        <option value="Expense">Expense</option>
-        <option value="Payment">Payment</option>
-      </select>
+<div class="container">
+  <h1>Business Tracker</h1>
+  <p id="user">Loading...</p>
 
-      <label for="item-name">Item Name</label>
-      <input type="text" id="item-name" required>
+  <form id="expense-form">
+    <label for="type">Type</label>
+    <select id="type" required>
+      <option value="Expense">Expense</option>
+      <option value="Payment">Payment</option>
+    </select>
 
-      <label for="item-number">Item Number</label>
-      <input type="text" id="item-number" required>
+    <label for="item-name">Item Name</label>
+    <input type="text" id="item-name" required>
 
-      <label for="amount">Amount</label>
-      <input type="number" id="amount" required>
+    <label for="item-number">Item Number</label>
+    <input type="text" id="item-number" required>
 
-      <label for="description">Description</label>
-      <input type="text" id="description" required>
+    <label for="amount">Amount</label>
+    <input type="number" id="amount" required>
 
-      <label for="added-by">Added By</label>
-      <select id="added-by" required>
-        <option value="Ranveer">Ranveer</option>
-        <option value="Aman">Aman</option>
-      </select>
+    <label for="description">Description</label>
+    <input type="text" id="description" required>
 
-      <button type="submit">Submit Log</button>
-    </form>
+    <label for="added-by">Added By</label>
+    <select id="added-by" required>
+      <option value="Ranveer">Ranveer</option>
+      <option value="Aman">Aman</option>
+    </select>
 
-    <h2>Recent Activity</h2>
-    <canvas id="activity-chart"></canvas>
+    <button type="submit">Submit Log</button>
+  </form>
 
-    <h2>Activity Spreadsheet</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Date/Time</th>
-          <th>Item Name</th>
-          <th>Item Number</th>
-          <th>Who Paid</th>
-          <th>Added By</th>
-          <th>Price</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="table-body"></tbody>
-    </table>
+  <h2>Activity Spreadsheet</h2>
+  <table id="log-table">
+    <thead>
+    <tr>
+      <th>Date Time</th>
+      <th>Type</th>
+      <th>Item</th>
+      <th>Number</th>
+      <th>Amount</th>
+      <th>Added By</th>
+      <th>Who Paid</th>
+      <th>Action</th>
+    </tr>
+    </thead>
+    <tbody id="log-list"></tbody>
+  </table>
 
-    <button id="logout">Logout</button>
-  </div>
+  <div id="settlement-summary" class="settlement-card">Calculating settlements...</div>
+
+  <button id="logout">Logout</button>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+  import {
+    getFirestore, collection, addDoc, serverTimestamp,
+    query, orderBy, onSnapshot, deleteDoc, doc
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
+    authDomain: "epoxyresin-60ea7.firebaseapp.com",
+    projectId: "epoxyresin-60ea7",
+    storageBucket: "epoxyresin-60ea7.appspot.com",
+    messagingSenderId: "591026708184",
+    appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const userLabel = document.getElementById("user");
+  const expenseForm = document.getElementById("expense-form");
+  const logList = document.getElementById("log-list");
+  const logoutBtn = document.getElementById("logout");
+  const settlementDiv = document.getElementById("settlement-summary");
+
+  let currentUser = null;
+
+  onAuthStateChanged(auth, user => {
+    if (user) {
+      currentUser = user;
+      userLabel.textContent = `Logged in as: ${user.email}`;
+      loadLogs();
+    } else {
+      window.location.href = "/login.html";
+    }
+  });
+
+  expenseForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const type = document.getElementById("type").value;
+    const itemName = document.getElementById("item-name").value;
+    const itemNumber = document.getElementById("item-number").value;
+    const amount = parseFloat(document.getElementById("amount").value);
+    const description = document.getElementById("description").value;
+    const addedBy = document.getElementById("added-by").value;
+    const userName = currentUser.email.includes("ranveer") ? "Ranveer" : "Aman";
+
+    await addDoc(collection(db, "businessLogs"), {
+      type,
+      itemName,
+      itemNumber,
+      amount,
+      description,
+      addedBy,
+      user: userName,
+      timestamp: serverTimestamp()
+    });
+
+    expenseForm.reset();
+  });
+
+  function loadLogs() {
+    const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
+    onSnapshot(q, (snapshot) => {
+      logList.innerHTML = "";
+
+      let ranveerBalance = 0;
+      let amanBalance = 0;
+
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        const id = docSnap.id;
+        const time = data.timestamp?.toDate().toLocaleString() ?? "Unknown time";
+
+        // Settlement calculation
+        if (data.type === "Expense") {
+          if (data.addedBy === "Ranveer") {
+            ranveerBalance += data.amount / 2;
+            amanBalance -= data.amount / 2;
+          } else {
+            amanBalance += data.amount / 2;
+            ranveerBalance -= data.amount / 2;
+          }
+        } else if (data.type === "Payment") {
+          if (data.addedBy === "Ranveer") {
+            ranveerBalance -= data.amount / 2;
+            amanBalance += data.amount / 2;
+          } else {
+            amanBalance -= data.amount / 2;
+            ranveerBalance += data.amount / 2;
+          }
+        }
+
+        // UI Table
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${time}</td>
+          <td>${data.type}</td>
+          <td>${data.itemName}</td>
+          <td>${data.itemNumber}</td>
+          <td>$${data.amount}</td>
+          <td>${data.addedBy}</td>
+          <td>${data.user}</td>
+          <td><button class="delete-btn" data-id="${id}">Delete</button></td>
+        `;
+        logList.appendChild(tr);
+      });
+
+      // Show settlement
+      if (ranveerBalance > amanBalance) {
+        settlementDiv.textContent = `💰 Current Settlement: Aman owes Ranveer $${(ranveerBalance - amanBalance).toFixed(2)}`;
+      } else if (amanBalance > ranveerBalance) {
+        settlementDiv.textContent = `💰 Current Settlement: Ranveer owes Aman $${(amanBalance - ranveerBalance).toFixed(2)}`;
+      } else {
+        settlementDiv.textContent = `✅ Both are settled equally.`;
+      }
+
+      // Delete listeners
+      document.querySelectorAll(".delete-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const id = btn.dataset.id;
+          await deleteDoc(doc(db, "businessLogs", id));
+        });
+      });
+    });
+  }
+
+  logoutBtn.onclick = () => signOut(auth);
+</script>
 </body>
 </html>
