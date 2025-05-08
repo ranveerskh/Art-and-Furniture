@@ -104,6 +104,10 @@
       <tbody id="log-table-body"></tbody>
     </table>
 
+    <h2>Monthly & Yearly Summary</h2>
+    <div class="settlement" id="monthly-summary">Loading monthly summary...</div>
+    <div class="settlement" id="yearly-summary">Loading yearly summary...</div>
+
     <button id="logout">Logout</button>
   </div>
 
@@ -130,6 +134,8 @@
     const logTableBody = document.getElementById("log-table-body");
     const logoutBtn = document.getElementById("logout");
     const settlementDiv = document.getElementById("settlement");
+    const monthlySummaryDiv = document.getElementById("monthly-summary");
+    const yearlySummaryDiv = document.getElementById("yearly-summary");
 
     let currentUser = null;
 
@@ -175,34 +181,49 @@
         let ranveerBalance = 0;
         let amanBalance = 0;
 
+        // Profit/loss tracking
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        let monthlyIncome = 0;
+        let monthlyExpense = 0;
+        let yearlyIncome = 0;
+        let yearlyExpense = 0;
+
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
           const id = docSnap.id;
-          const time = data.timestamp?.toDate().toLocaleString() ?? "Unknown";
+          const time = data.timestamp?.toDate();
+          const formattedTime = time?.toLocaleString() ?? "Unknown";
 
-          // Settlement Calculation
+          // Settlement
           if (data.type === "Expense") {
-            if (data.addedBy === "Ranveer") {
-              amanBalance -= data.amount / 2;
-            } else {
-              ranveerBalance -= data.amount / 2;
-            }
+            if (data.addedBy === "Ranveer") amanBalance -= data.amount / 2;
+            else ranveerBalance -= data.amount / 2;
           } else if (data.type === "Payment") {
-            if (data.addedBy === "Ranveer") {
-              amanBalance += data.amount / 2;
-            } else {
-              ranveerBalance += data.amount / 2;
+            if (data.addedBy === "Ranveer") amanBalance += data.amount / 2;
+            else ranveerBalance += data.amount / 2;
+          }
+
+          // Monthly/yearly summary
+          if (time && time.getFullYear() === currentYear) {
+            if (data.type === "Expense") yearlyExpense += data.amount;
+            if (data.type === "Payment") yearlyIncome += data.amount;
+
+            if (time.getMonth() === currentMonth) {
+              if (data.type === "Expense") monthlyExpense += data.amount;
+              if (data.type === "Payment") monthlyIncome += data.amount;
             }
           }
 
           // Add row
           const row = document.createElement("tr");
           row.innerHTML = `
-            <td>${time}</td>
+            <td>${formattedTime}</td>
             <td>${data.type}</td>
             <td>${data.itemName}</td>
             <td>${data.itemNumber}</td>
-            <td>$${data.amount.toFixed(2)}</td>
+            <td>₹${data.amount.toFixed(2)}</td>
             <td>${data.description}</td>
             <td>${data.user}</td>
             <td>${data.addedBy}</td>
@@ -211,8 +232,8 @@
           logTableBody.appendChild(row);
         });
 
+        // Show settlement
         const balance = ranveerBalance - amanBalance;
-
         let message = "";
         if (balance > 0) {
           message = `Aman owes Ranveer ₹${Math.abs(balance).toFixed(2)}`;
@@ -221,8 +242,17 @@
         } else {
           message = "All Settled!";
         }
-
         settlementDiv.textContent = message;
+
+        // Monthly and Yearly Summary Output
+        const monthlyProfit = monthlyIncome - monthlyExpense;
+        const yearlyProfit = yearlyIncome - yearlyExpense;
+
+        monthlySummaryDiv.textContent =
+          `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, Profit ₹${monthlyProfit.toFixed(2)}`;
+
+        yearlySummaryDiv.textContent =
+          `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, Profit ₹${yearlyProfit.toFixed(2)}`;
       });
     }
 
