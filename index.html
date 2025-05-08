@@ -87,18 +87,6 @@
     <div class="settlement" id="settlement">Calculating settlement...</div>
 
     <h2>Activity Log</h2>
-
-    <!-- Filter Dropdown -->
-    <div>
-      <label for="log-filter">Filter Logs: </label>
-      <select id="log-filter">
-        <option value="recent">Recent 10</option>
-        <option value="monthly">Monthly</option>
-        <option value="expense">Only Expenses</option>
-        <option value="payment">Only Payments</option>
-      </select>
-    </div>
-
     <table>
       <thead>
         <tr>
@@ -150,11 +138,8 @@
     const monthlySummaryDiv = document.getElementById("monthly-summary");
     const yearlySummaryDiv = document.getElementById("yearly-summary");
     const exportMonthlyBtn = document.getElementById("export-monthly");
-    const logFilter = document.getElementById("log-filter");
 
     let currentUser = null;
-    let allLogs = [];
-    let filteredLogs = [];
     let monthlyLogs = [];
 
     onAuthStateChanged(auth, user => {
@@ -194,12 +179,16 @@
     function loadLogs() {
       const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
       onSnapshot(q, (snapshot) => {
-        allLogs = [];
-        filteredLogs = []; // Reset the filtered logs
-        monthlyLogs = [];
+        logTableBody.innerHTML = "";
+        monthlyLogs = []; // Reset the logs for monthly export
 
         let ranveerBalance = 0;
         let amanBalance = 0;
+
+        // Profit/loss tracking
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
         let monthlyIncome = 0;
         let monthlyExpense = 0;
         let yearlyIncome = 0;
@@ -211,7 +200,7 @@
           const time = data.timestamp?.toDate();
           const formattedTime = time?.toLocaleString() ?? "Unknown";
 
-          // Settlement Calculation
+          // Settlement
           if (data.type === "Expense") {
             if (data.addedBy === "Ranveer") amanBalance -= data.amount / 2;
             else ranveerBalance -= data.amount / 2;
@@ -220,21 +209,19 @@
             else ranveerBalance += data.amount / 2;
           }
 
-          // Monthly/Yearly Summary Calculation
-          if (time && time.getFullYear() === new Date().getFullYear()) {
+          // Monthly/yearly summary
+          if (time && time.getFullYear() === currentYear) {
             if (data.type === "Expense") yearlyExpense += data.amount;
             if (data.type === "Payment") yearlyIncome += data.amount;
 
-            if (time.getMonth() === new Date().getMonth()) {
+            if (time.getMonth() === currentMonth) {
               if (data.type === "Expense") monthlyExpense += data.amount;
               if (data.type === "Payment") monthlyIncome += data.amount;
               monthlyLogs.push(data); // Add to the monthly logs
             }
           }
 
-          allLogs.push(data); // Store all logs for default and filtered view
-
-          // Add row to log table
+          // Add row
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${formattedTime}</td>
@@ -250,7 +237,7 @@
           logTableBody.appendChild(row);
         });
 
-        // Calculate and show settlement
+        // Show settlement
         const balance = ranveerBalance - amanBalance;
         let message = "";
         if (balance > 0) {
@@ -262,93 +249,58 @@
         }
         settlementDiv.textContent = message;
 
-        // Show monthly and yearly summary
+        // Monthly and Yearly Summary Output
         const monthlyProfit = monthlyIncome - monthlyExpense;
         const yearlyProfit = yearlyIncome - yearlyExpense;
 
+        // Monthly Summary
         const monthlyType = monthlyProfit < 0 ? "Loss" : "Profit";
+        monthlySummaryDiv.textContent =
+          `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, ${monthlyType} ₹${Math.abs(monthlyProfit).toFixed(2)}`;
+        monthlySummaryDiv.style.backgroundColor = monthlyProfit < 0 ? "#f8d7da" : "#dff0d8";
+
+        // Yearly Summary
         const yearlyType = yearlyProfit < 0 ? "Loss" : "Profit";
-
-        monthlySummaryDiv.innerHTML = `
-          Monthly Summary: ₹${monthlyProfit.toFixed(2)} (${monthlyType})
-        `;
-        yearlySummaryDiv.innerHTML = `
-          Yearly Summary: ₹${yearlyProfit.toFixed(2)} (${yearlyType})
-        `;
+        yearlySummaryDiv.textContent =
+          `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, ${yearlyType} ₹${Math.abs(yearlyProfit).toFixed(2)}`;
+        yearlySummaryDiv.style.backgroundColor = yearlyProfit < 0 ? "#f8d7da" : "#dff0d8";
       });
     }
 
-    function displayLogs(logs) {
-      logTableBody.innerHTML = "";
-      logs.forEach(log => {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${log.timestamp?.toDate().toLocaleString()}</td>
-          <td>${log.type}</td>
-          <td>${log.itemName}</td>
-          <td>${log.itemNumber}</td>
-          <td>₹${log.amount.toFixed(2)}</td>
-          <td>${log.description}</td>
-          <td>${log.user}</td>
-          <td>${log.addedBy}</td>
-          <td><button onclick="deleteEntry('${log.id}')">Delete</button></td>
-        `;
-        logTableBody.appendChild(row);
+    function exportCSV(data) {
+      const headers = ["Date/Time", "Type", "Item", "Number", "Amount", "Description", "Paid By", "Added By"];
+      const rows = data.map(d => [
+        d.timestamp?.toDate().toLocaleString() ?? "Unknown",
+        d.type,
+        d.itemName,
+        d.itemNumber,
+        `₹${d.amount.toFixed(2)}`,
+        d.description,
+        d.user,
+        d.addedBy
+      ]);
+
+      let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+      rows.forEach(row => {
+        csvContent += row.join(",") + "\n";
       });
-    }
-
-    // Filter logs based on dropdown
-    logFilter.addEventListener("change", (e) => {
-      const filterValue = e.target.value;
-      let filtered = [];
-      
-      if (filterValue === "recent") {
-        filtered = allLogs.slice(0, 10); // Show recent 10 logs
-      } else if (filterValue === "monthly") {
-        filtered = monthlyLogs;
-      } else if (filterValue === "expense") {
-        filtered = allLogs.filter(log => log.type === "Expense");
-      } else if (filterValue === "payment") {
-        filtered = allLogs.filter(log => log.type === "Payment");
-      }
-      
-      displayLogs(filtered);
-    });
-
-    // Export Monthly CSV
-    exportMonthlyBtn.addEventListener("click", () => {
-      const csvContent = "data:text/csv;charset=utf-8,"
-        + ["Date/Time", "Type", "Item", "Number", "Amount", "Description", "Paid By", "Added By"].join(",")
-        + "\n"
-        + monthlyLogs.map(log => [
-          log.timestamp?.toDate().toLocaleString(),
-          log.type,
-          log.itemName,
-          log.itemNumber,
-          `₹${log.amount.toFixed(2)}`,
-          log.description,
-          log.user,
-          log.addedBy
-        ].join(",")).join("\n");
 
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "monthly-summary.csv");
-      document.body.appendChild(link);
+      link.setAttribute("download", "monthly_logs.csv");
       link.click();
-    });
+    }
 
-    // Function to delete entry
-    async function deleteEntry(id) {
+    exportMonthlyBtn.onclick = () => {
+      exportCSV(monthlyLogs);
+    };
+
+    window.deleteEntry = async function(id) {
       await deleteDoc(doc(db, "businessLogs", id));
     }
 
-    // Logout functionality
-    logoutBtn.addEventListener("click", async () => {
-      await signOut(auth);
-      window.location.href = "/login.html";
-    });
+    logoutBtn.onclick = () => signOut(auth);
   </script>
 </body>
 </html>
