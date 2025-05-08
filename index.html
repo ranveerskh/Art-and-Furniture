@@ -51,11 +51,22 @@
     th {
       background-color: #f2f2f2;
     }
+    .delete-btn {
+      background-color: #f44336; /* Red button for delete */
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+    .delete-btn:hover {
+      background-color: #d32f2f;
+    }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
@@ -128,12 +139,15 @@
 
           // Add log to table
           const row = document.createElement("tr");
+          row.setAttribute("data-id", doc.id); // Store doc ID for delete action
           row.innerHTML = `
             <td>${time}</td>
             <td>${data.itemName}</td>
             <td>${data.itemNumber}</td>
             <td>${user}</td>
             <td>${addedBy}</td>
+            <td>$${data.amount}</td>
+            <td><button class="delete-btn" onclick="deleteLog('${doc.id}')">Delete</button></td>
           `;
           tableBody.appendChild(row);
 
@@ -173,6 +187,11 @@
           }
         }
       });
+    }
+
+    async function deleteLog(docId) {
+      const docRef = doc(db, "businessLogs", docId);
+      await deleteDoc(docRef);
     }
 
     logoutBtn.onclick = () => signOut(auth);
@@ -222,6 +241,8 @@
           <th>Item Number</th>
           <th>Who Paid</th>
           <th>Added By</th>
+          <th>Price</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody id="table-body"></tbody>
