@@ -3,67 +3,35 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Login - Business Tracker</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <title>Business Tracker</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css" />
   <style>
     body {
-      font-family: 'Inter', sans-serif;
-      background: #f7f9fc;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
+      margin: 40px;
+      background-color: #f5f5f5;
     }
-    .login-box {
+    .container {
+      max-width: 800px;
+      margin: auto;
       background: white;
-      padding: 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-      width: 100%;
-      max-width: 400px;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
-    h2 {
-      margin-bottom: 20px;
+    h1, h2 {
       text-align: center;
     }
-    input, button {
-      width: 100%;
-      padding: 12px;
-      margin-top: 10px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-    button {
-      background-color: #007bff;
-      color: white;
-      border: none;
-      cursor: pointer;
-    }
-    button:hover {
-      background-color: #0056b3;
-    }
-    .error {
-      color: red;
-      margin-top: 10px;
-      text-align: center;
+    #log-list li {
+      margin-bottom: 10px;
+      background: #f1f1f1;
+      padding: 10px;
+      border-radius: 5px;
     }
   </style>
-</head>
-<body>
-  <div class="login-box">
-    <h2>Login</h2>
-    <form id="login-form">
-      <input type="email" id="email" placeholder="Email" required />
-      <input type="password" id="password" placeholder="Password" required />
-      <button type="submit">Login</button>
-    </form>
-    <div class="error" id="error-message"></div>
-  </div>
-
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
@@ -76,20 +44,108 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
+    const db = getFirestore(app);
 
-    document.getElementById("login-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const email = document.getElementById("email").value;
-      const password = document.getElementById("password").value;
-      const errorDiv = document.getElementById("error-message");
+    const userLabel = document.getElementById("user");
+    const expenseForm = document.getElementById("expense-form");
+    const logList = document.getElementById("log-list");
+    const logoutBtn = document.getElementById("logout");
 
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-        window.location.href = "/index.html"; // change path if needed
-      } catch (error) {
-        errorDiv.textContent = error.message;
+    let currentUser = null;
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        currentUser = user;
+        userLabel.textContent = `Logged in as: ${user.email}`;
+        loadLogs();
+      } else {
+        window.location.href = "/login.html";
       }
     });
+
+    expenseForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const type = document.getElementById("type").value;
+      const itemName = document.getElementById("item-name").value;
+      const itemNumber = document.getElementById("item-number").value;
+      const amount = parseFloat(document.getElementById("amount").value);
+      const description = document.getElementById("description").value;
+      const addedBy = document.getElementById("added-by").value;
+      const userName = currentUser.email.includes("ranveer") ? "Ranveer" : "Aman";
+
+      await addDoc(collection(db, "businessLogs"), {
+        type,
+        itemName,
+        itemNumber,
+        amount,
+        description,
+        addedBy,
+        user: userName,
+        timestamp: serverTimestamp()
+      });
+
+      expenseForm.reset();
+    });
+
+    function loadLogs() {
+      const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
+      onSnapshot(q, (snapshot) => {
+        logList.innerHTML = "";
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          const li = document.createElement("li");
+          const time = data.timestamp?.toDate().toLocaleString() ?? "Unknown time";
+          li.innerHTML = `<strong>${time}</strong><br>
+            <em>${data.user}</em> added a <strong>${data.type}</strong><br>
+            Item: ${data.itemName} (#${data.itemNumber})<br>
+            Amount: $${data.amount}<br>
+            Description: ${data.description}<br>
+            Added by: ${data.addedBy}`;
+          logList.appendChild(li);
+        });
+      });
+    }
+
+    logoutBtn.onclick = () => signOut(auth);
   </script>
+</head>
+<body>
+  <div class="container">
+    <h1>Business Tracker</h1>
+    <p id="user">Loading...</p>
+    <form id="expense-form">
+      <label for="type">Type</label>
+      <select id="type" required>
+        <option value="Expense">Expense</option>
+        <option value="Payment">Payment</option>
+      </select>
+
+      <label for="item-name">Item Name</label>
+      <input type="text" id="item-name" required>
+
+      <label for="item-number">Item Number</label>
+      <input type="text" id="item-number" required>
+
+      <label for="amount">Amount</label>
+      <input type="number" id="amount" required>
+
+      <label for="description">Description</label>
+      <input type="text" id="description" required>
+
+      <label for="added-by">Added By</label>
+      <select id="added-by" required>
+        <option value="Ranveer">Ranveer</option>
+        <option value="Aman">Aman</option>
+      </select>
+
+      <button type="submit">Submit Log</button>
+    </form>
+
+    <h2>Activity Logs</h2>
+    <ul id="log-list"></ul>
+
+    <button id="logout">Logout</button>
+  </div>
 </body>
 </html>
