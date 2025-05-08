@@ -87,6 +87,18 @@
     <div class="settlement" id="settlement">Calculating settlement...</div>
 
     <h2>Activity Log</h2>
+
+    <!-- Filter Dropdown -->
+    <div>
+      <label for="log-filter">Filter Logs: </label>
+      <select id="log-filter">
+        <option value="recent">Recent 10</option>
+        <option value="monthly">Monthly</option>
+        <option value="expense">Only Expenses</option>
+        <option value="payment">Only Payments</option>
+      </select>
+    </div>
+
     <table>
       <thead>
         <tr>
@@ -138,8 +150,11 @@
     const monthlySummaryDiv = document.getElementById("monthly-summary");
     const yearlySummaryDiv = document.getElementById("yearly-summary");
     const exportMonthlyBtn = document.getElementById("export-monthly");
+    const logFilter = document.getElementById("log-filter");
 
     let currentUser = null;
+    let allLogs = [];
+    let filteredLogs = [];
     let monthlyLogs = [];
 
     onAuthStateChanged(auth, user => {
@@ -179,8 +194,9 @@
     function loadLogs() {
       const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
       onSnapshot(q, (snapshot) => {
-        logTableBody.innerHTML = "";
-        monthlyLogs = []; // Reset the logs for monthly export
+        allLogs = [];
+        filteredLogs = []; // Reset the filtered logs
+        monthlyLogs = [];
 
         let ranveerBalance = 0;
         let amanBalance = 0;
@@ -221,6 +237,8 @@
             }
           }
 
+          allLogs.push(data); // Store all logs for default and filtered view
+
           // Add row
           const row = document.createElement("tr");
           row.innerHTML = `
@@ -234,8 +252,12 @@
             <td>${data.addedBy}</td>
             <td><button onclick="deleteEntry('${id}')">Delete</button></td>
           `;
-          logTableBody.appendChild(row);
+          allLogs.push(row);
         });
+
+        // Set initial logs to show only recent 10 entries
+        filteredLogs = allLogs.slice(0, 10);
+        displayLogs(filteredLogs);
 
         // Show settlement
         const balance = ranveerBalance - amanBalance;
@@ -267,40 +289,73 @@
       });
     }
 
-    function exportCSV(data) {
-      const headers = ["Date/Time", "Type", "Item", "Number", "Amount", "Description", "Paid By", "Added By"];
-      const rows = data.map(d => [
-        d.timestamp?.toDate().toLocaleString() ?? "Unknown",
-        d.type,
-        d.itemName,
-        d.itemNumber,
-        `₹${d.amount.toFixed(2)}`,
-        d.description,
-        d.user,
-        d.addedBy
-      ]);
-
-      let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
-      rows.forEach(row => {
-        csvContent += row.join(",") + "\n";
+    function displayLogs(logs) {
+      logTableBody.innerHTML = "";
+      logs.forEach((log) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${log.timestamp?.toDate().toLocaleString() ?? "Unknown"}</td>
+          <td>${log.type}</td>
+          <td>${log.itemName}</td>
+          <td>${log.itemNumber}</td>
+          <td>₹${log.amount.toFixed(2)}</td>
+          <td>${log.description}</td>
+          <td>${log.user}</td>
+          <td>${log.addedBy}</td>
+          <td><button onclick="deleteEntry('${log.id}')">Delete</button></td>
+        `;
+        logTableBody.appendChild(row);
       });
+    }
+
+    // Event listener for log filter
+    logFilter.addEventListener("change", (e) => {
+      const filterValue = e.target.value;
+      if (filterValue === "recent") {
+        filteredLogs = allLogs.slice(0, 10);
+      } else if (filterValue === "monthly") {
+        filteredLogs = monthlyLogs;
+      } else if (filterValue === "expense") {
+        filteredLogs = allLogs.filter(log => log.type === "Expense");
+      } else if (filterValue === "payment") {
+        filteredLogs = allLogs.filter(log => log.type === "Payment");
+      }
+      displayLogs(filteredLogs);
+    });
+
+    exportMonthlyBtn.addEventListener("click", () => {
+      const csvContent = "data:text/csv;charset=utf-8,"
+        + ["Date/Time", "Type", "Item", "Number", "Amount", "Description", "Paid By", "Added By"].join(",")
+        + "\n"
+        + monthlyLogs.map(log => [
+          log.timestamp?.toDate().toLocaleString(),
+          log.type,
+          log.itemName,
+          log.itemNumber,
+          `₹${log.amount.toFixed(2)}`,
+          log.description,
+          log.user,
+          log.addedBy
+        ].join(",")).join("\n");
 
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "monthly_logs.csv");
+      link.setAttribute("download", "monthly-summary.csv");
+      document.body.appendChild(link);
       link.click();
-    }
+    });
 
-    exportMonthlyBtn.onclick = () => {
-      exportCSV(monthlyLogs);
-    };
-
-    window.deleteEntry = async function(id) {
+    // Function to delete entry
+    async function deleteEntry(id) {
       await deleteDoc(doc(db, "businessLogs", id));
     }
 
-    logoutBtn.onclick = () => signOut(auth);
+    // Logout functionality
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "/login.html";
+    });
   </script>
 </body>
 </html>
