@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Business Tracker</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
       margin: 40px;
@@ -21,30 +22,25 @@
     h1, h2 {
       text-align: center;
     }
-    #log-list li {
-      margin-bottom: 10px;
-      background: #f1f1f1;
-      padding: 10px;
-      border-radius: 5px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
     button {
-      background-color: red;
+      background-color: #4CAF50; /* Green button */
       color: white;
       border: none;
-      padding: 5px 10px;
+      padding: 10px 20px;
       cursor: pointer;
+      border-radius: 5px;
     }
     button:hover {
-      background-color: darkred;
+      background-color: #45a049;
+    }
+    canvas {
+      margin-top: 20px;
     }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
@@ -61,10 +57,11 @@
 
     const userLabel = document.getElementById("user");
     const expenseForm = document.getElementById("expense-form");
-    const logList = document.getElementById("log-list");
     const logoutBtn = document.getElementById("logout");
 
     let currentUser = null;
+    const activityChartCtx = document.getElementById("activity-chart").getContext("2d");
+    let activityChart = null;
 
     onAuthStateChanged(auth, user => {
       if (user) {
@@ -101,32 +98,48 @@
       expenseForm.reset();
     });
 
-    async function deleteLog(logId) {
-      const logRef = doc(db, "businessLogs", logId);
-      await deleteDoc(logRef);
-    }
-
     function loadLogs() {
       const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
       onSnapshot(q, (snapshot) => {
-        logList.innerHTML = "";
+        const activityData = { Expense: 0, Payment: 0 }; // Counts for each type
         snapshot.forEach((doc) => {
           const data = doc.data();
-          const li = document.createElement("li");
-          const time = data.timestamp?.toDate().toLocaleString() ?? "Unknown time";
-          li.innerHTML = `
-            <div>
-              <strong>${time}</strong><br>
-              <em>${data.user}</em> added a <strong>${data.type}</strong><br>
-              Item: ${data.itemName} (#${data.itemNumber})<br>
-              Amount: $${data.amount}<br>
-              Description: ${data.description}<br>
-              Added by: ${data.addedBy}
-            </div>
-            <button onclick="deleteLog('${doc.id}')">Delete</button>
-          `;
-          logList.appendChild(li);
+          const type = data.type;
+          if (type === "Expense") {
+            activityData.Expense++;
+          } else if (type === "Payment") {
+            activityData.Payment++;
+          }
         });
+
+        updateActivityChart(activityData);
+      });
+    }
+
+    function updateActivityChart(activityData) {
+      if (activityChart) {
+        activityChart.destroy();
+      }
+
+      activityChart = new Chart(activityChartCtx, {
+        type: 'bar',
+        data: {
+          labels: ['Expense', 'Payment'],
+          datasets: [{
+            label: 'Recent Activity',
+            data: [activityData.Expense, activityData.Payment],
+            backgroundColor: ['#FF5733', '#33FF57'],
+            borderColor: ['#FF5733', '#33FF57'],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true
+            }
+          }
+        }
       });
     }
 
@@ -165,8 +178,8 @@
       <button type="submit">Submit Log</button>
     </form>
 
-    <h2>Activity Logs</h2>
-    <ul id="log-list"></ul>
+    <h2>Recent Activity</h2>
+    <canvas id="activity-chart"></canvas>
 
     <button id="logout">Logout</button>
   </div>
