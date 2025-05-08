@@ -200,11 +200,6 @@
 
         let ranveerBalance = 0;
         let amanBalance = 0;
-
-        // Profit/loss tracking
-        const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
         let monthlyIncome = 0;
         let monthlyExpense = 0;
         let yearlyIncome = 0;
@@ -216,7 +211,7 @@
           const time = data.timestamp?.toDate();
           const formattedTime = time?.toLocaleString() ?? "Unknown";
 
-          // Settlement
+          // Settlement Calculation
           if (data.type === "Expense") {
             if (data.addedBy === "Ranveer") amanBalance -= data.amount / 2;
             else ranveerBalance -= data.amount / 2;
@@ -225,12 +220,12 @@
             else ranveerBalance += data.amount / 2;
           }
 
-          // Monthly/yearly summary
-          if (time && time.getFullYear() === currentYear) {
+          // Monthly/Yearly Summary Calculation
+          if (time && time.getFullYear() === new Date().getFullYear()) {
             if (data.type === "Expense") yearlyExpense += data.amount;
             if (data.type === "Payment") yearlyIncome += data.amount;
 
-            if (time.getMonth() === currentMonth) {
+            if (time.getMonth() === new Date().getMonth()) {
               if (data.type === "Expense") monthlyExpense += data.amount;
               if (data.type === "Payment") monthlyIncome += data.amount;
               monthlyLogs.push(data); // Add to the monthly logs
@@ -239,7 +234,7 @@
 
           allLogs.push(data); // Store all logs for default and filtered view
 
-          // Add row
+          // Add row to log table
           const row = document.createElement("tr");
           row.innerHTML = `
             <td>${formattedTime}</td>
@@ -252,14 +247,10 @@
             <td>${data.addedBy}</td>
             <td><button onclick="deleteEntry('${id}')">Delete</button></td>
           `;
-          allLogs.push(row);
+          logTableBody.appendChild(row);
         });
 
-        // Set initial logs to show only recent 10 entries
-        filteredLogs = allLogs.slice(0, 10);
-        displayLogs(filteredLogs);
-
-        // Show settlement
+        // Calculate and show settlement
         const balance = ranveerBalance - amanBalance;
         let message = "";
         if (balance > 0) {
@@ -271,30 +262,28 @@
         }
         settlementDiv.textContent = message;
 
-        // Monthly and Yearly Summary Output
+        // Show monthly and yearly summary
         const monthlyProfit = monthlyIncome - monthlyExpense;
         const yearlyProfit = yearlyIncome - yearlyExpense;
 
-        // Monthly Summary
         const monthlyType = monthlyProfit < 0 ? "Loss" : "Profit";
-        monthlySummaryDiv.textContent =
-          `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, ${monthlyType} ₹${Math.abs(monthlyProfit).toFixed(2)}`;
-        monthlySummaryDiv.style.backgroundColor = monthlyProfit < 0 ? "#f8d7da" : "#dff0d8";
-
-        // Yearly Summary
         const yearlyType = yearlyProfit < 0 ? "Loss" : "Profit";
-        yearlySummaryDiv.textContent =
-          `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, ${yearlyType} ₹${Math.abs(yearlyProfit).toFixed(2)}`;
-        yearlySummaryDiv.style.backgroundColor = yearlyProfit < 0 ? "#f8d7da" : "#dff0d8";
+
+        monthlySummaryDiv.innerHTML = `
+          Monthly Summary: ₹${monthlyProfit.toFixed(2)} (${monthlyType})
+        `;
+        yearlySummaryDiv.innerHTML = `
+          Yearly Summary: ₹${yearlyProfit.toFixed(2)} (${yearlyType})
+        `;
       });
     }
 
     function displayLogs(logs) {
       logTableBody.innerHTML = "";
-      logs.forEach((log) => {
+      logs.forEach(log => {
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${log.timestamp?.toDate().toLocaleString() ?? "Unknown"}</td>
+          <td>${log.timestamp?.toDate().toLocaleString()}</td>
           <td>${log.type}</td>
           <td>${log.itemName}</td>
           <td>${log.itemNumber}</td>
@@ -308,21 +297,25 @@
       });
     }
 
-    // Event listener for log filter
+    // Filter logs based on dropdown
     logFilter.addEventListener("change", (e) => {
       const filterValue = e.target.value;
+      let filtered = [];
+      
       if (filterValue === "recent") {
-        filteredLogs = allLogs.slice(0, 10);
+        filtered = allLogs.slice(0, 10); // Show recent 10 logs
       } else if (filterValue === "monthly") {
-        filteredLogs = monthlyLogs;
+        filtered = monthlyLogs;
       } else if (filterValue === "expense") {
-        filteredLogs = allLogs.filter(log => log.type === "Expense");
+        filtered = allLogs.filter(log => log.type === "Expense");
       } else if (filterValue === "payment") {
-        filteredLogs = allLogs.filter(log => log.type === "Payment");
+        filtered = allLogs.filter(log => log.type === "Payment");
       }
-      displayLogs(filteredLogs);
+      
+      displayLogs(filtered);
     });
 
+    // Export Monthly CSV
     exportMonthlyBtn.addEventListener("click", () => {
       const csvContent = "data:text/csv;charset=utf-8,"
         + ["Date/Time", "Type", "Item", "Number", "Amount", "Description", "Paid By", "Added By"].join(",")
