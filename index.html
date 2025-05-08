@@ -189,10 +189,11 @@
       });
     }
 
-    async function deleteLog(docId) {
-      const docRef = doc(db, "businessLogs", docId);
-      await deleteDoc(docRef);
-    }
+    window.deleteLog = async function(docId) {
+  const docRef = doc(db, "businessLogs", docId);
+  await deleteDoc(docRef);
+};
+
 
     logoutBtn.onclick = () => signOut(auth);
   </script>
