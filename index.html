@@ -3,33 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login</title>
+  <title>Login - Business Tracker</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css">
   <style>
     body {
-      background: #f9f9f9;
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       height: 100vh;
-      margin: 0;
+      background-color: #f4f4f4;
     }
     .login-container {
       background: white;
       padding: 30px;
       border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      max-width: 400px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       width: 100%;
+      max-width: 400px;
     }
-    h2 {
+    .login-container h2 {
       text-align: center;
+    }
+    #error-message {
+      color: red;
+      text-align: center;
+      margin-top: 10px;
+      display: none;
     }
   </style>
 </head>
 <body>
   <div class="login-container">
-    <h2>Business Tracker Login</h2>
+    <h2>Login</h2>
     <form id="login-form">
       <label for="email">Email</label>
       <input type="email" id="email" placeholder="Enter email" required>
@@ -39,7 +44,7 @@
 
       <button type="submit" class="button-primary">Login</button>
     </form>
-    <p id="error-message" style="color: red; text-align: center; display: none;">Login failed. Please try again.</p>
+    <div id="error-message"></div>
   </div>
 
   <script type="module">
@@ -63,14 +68,15 @@
 
     loginForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const email = document.getElementById("email").value;
+      const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
 
       try {
         await signInWithEmailAndPassword(auth, email, password);
         window.location.href = "/index.html";
       } catch (error) {
-        console.error("Login failed:", error);
+        console.error("Login error:", error);
+        errorMessage.textContent = "Login failed: " + error.message;
         errorMessage.style.display = "block";
       }
     });
