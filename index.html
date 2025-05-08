@@ -27,11 +27,19 @@
       padding: 10px;
       border-radius: 5px;
     }
+    #chart-container {
+      margin: 20px 0;
+    }
+    canvas {
+      max-width: 100%;
+      height: 400px;
+    }
   </style>
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { Chart } from "https://cdn.jsdelivr.net/npm/chart.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
@@ -50,8 +58,35 @@
     const expenseForm = document.getElementById("expense-form");
     const logList = document.getElementById("log-list");
     const logoutBtn = document.getElementById("logout");
+    const chartContainer = document.getElementById("chart-container");
+    const chartCanvas = document.createElement("canvas");
+    chartContainer.appendChild(chartCanvas);
 
     let currentUser = null;
+    const chartData = {
+      labels: [],
+      datasets: [{
+        label: 'Recent Entries',
+        data: [],
+        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        borderColor: 'rgba(75, 192, 192, 1)',
+        borderWidth: 1
+      }]
+    };
+    const chartConfig = {
+      type: 'bar',
+      data: chartData,
+      options: {
+        responsive: true,
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    };
+
+    const chart = new Chart(chartCanvas, chartConfig);
 
     onAuthStateChanged(auth, user => {
       if (user) {
@@ -92,10 +127,13 @@
       const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
       onSnapshot(q, (snapshot) => {
         logList.innerHTML = "";
+        chartData.labels = [];  // Clear previous data
+        chartData.datasets[0].data = [];  // Clear previous data
+
         snapshot.forEach((doc) => {
           const data = doc.data();
-          const li = document.createElement("li");
           const time = data.timestamp?.toDate().toLocaleString() ?? "Unknown time";
+          const li = document.createElement("li");
           li.innerHTML = `<strong>${time}</strong><br>
             <em>${data.user}</em> added a <strong>${data.type}</strong><br>
             Item: ${data.itemName} (#${data.itemNumber})<br>
@@ -103,7 +141,14 @@
             Description: ${data.description}<br>
             Added by: ${data.addedBy}`;
           logList.appendChild(li);
+
+          // Prepare chart data
+          chartData.labels.push(data.itemName);
+          chartData.datasets[0].data.push(data.amount);  // Assuming 'amount' is what you want to track
         });
+
+        // Update the chart with new data
+        chart.update();
       });
     }
 
@@ -144,6 +189,10 @@
 
     <h2>Activity Logs</h2>
     <ul id="log-list"></ul>
+
+    <div id="chart-container">
+      <h3>Recent Entries Chart</h3>
+    </div>
 
     <button id="logout">Logout</button>
   </div>
