@@ -88,12 +88,15 @@
 
     const chart = new Chart(chartCanvas, chartConfig);
 
+    // Debugging: Log authentication state
     onAuthStateChanged(auth, (user) => {
+      console.log('Auth state changed: ', user);
       if (user) {
         currentUser = user;
         userLabel.textContent = `Logged in as: ${user.email}`;
         loadLogs();
       } else {
+        userLabel.textContent = "Loading..."; // Display loading message while waiting
         window.location.href = "/login.html";
       }
     });
@@ -133,6 +136,7 @@
       try {
         const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
         onSnapshot(q, (snapshot) => {
+          console.log('Logs fetched: ', snapshot.size); // Debugging: Check logs fetched
           logList.innerHTML = ""; // Clear log list
           chartData.labels = [];  // Clear chart labels
           chartData.datasets[0].data = [];  // Clear chart data
