@@ -248,11 +248,18 @@
         const monthlyProfit = monthlyIncome - monthlyExpense;
         const yearlyProfit = yearlyIncome - yearlyExpense;
 
-        monthlySummaryDiv.textContent =
-          `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, Profit ₹${monthlyProfit.toFixed(2)}`;
+       // Monthly Summary
+const monthlyType = monthlyProfit < 0 ? "Loss" : "Profit";
+monthlySummaryDiv.textContent =
+  `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, ${monthlyType} ₹${Math.abs(monthlyProfit).toFixed(2)}`;
+monthlySummaryDiv.style.backgroundColor = monthlyProfit < 0 ? "#f8d7da" : "#dff0d8";
 
-        yearlySummaryDiv.textContent =
-          `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, Profit ₹${yearlyProfit.toFixed(2)}`;
+// Yearly Summary
+const yearlyType = yearlyProfit < 0 ? "Loss" : "Profit";
+yearlySummaryDiv.textContent =
+  `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, ${yearlyType} ₹${Math.abs(yearlyProfit).toFixed(2)}`;
+yearlySummaryDiv.style.backgroundColor = yearlyProfit < 0 ? "#f8d7da" : "#dff0d8";
+
       });
     }
 
