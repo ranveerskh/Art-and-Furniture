@@ -75,11 +75,14 @@
       <label for="description">Description</label>
       <input type="text" id="description" required>
 
-      <label for="added-by">Added By</label>
-      <select id="added-by" required>
-        <option value="Ranveer">Ranveer</option>
-        <option value="Aman">Aman</option>
-      </select>
+     <p><strong>Added By:</strong> <span id="added-by-display">Loading...</span></p>
+
+<label for="paid-by">Paid By</label>
+<select id="paid-by" required>
+  <option value="Ranveer">Ranveer</option>
+  <option value="Aman">Aman</option>
+</select>
+
 
       <button type="submit">Submit Log</button>
     </form>
@@ -144,9 +147,13 @@
 
     onAuthStateChanged(auth, user => {
       if (user) {
-        currentUser = user;
-        userLabel.textContent = `Logged in as: ${user.email}`;
-        loadLogs();
+  currentUser = user;
+  const username = user.email.includes("ranveer") ? "Ranveer" : "Aman";
+  userLabel.textContent = `Logged in as: ${user.email}`;
+  document.getElementById("added-by-display").textContent = username;
+  loadLogs();
+}
+
       } else {
         window.location.href = "/login.html";
       }
@@ -162,16 +169,16 @@
       const description = document.getElementById("description").value;
       const addedBy = document.getElementById("added-by").value;
 
-      await addDoc(collection(db, "businessLogs"), {
-        type,
-        itemName,
-        itemNumber,
-        amount,
-        description,
-        addedBy,
-        user: currentUser.email.includes("ranveer") ? "Ranveer" : "Aman",
-        timestamp: serverTimestamp()
-      });
+   await addDoc(collection(db, "businessLogs"), {
+  type,
+  itemName,
+  itemNumber,
+  amount,
+  description,
+  addedBy, // now from current user
+  user: paidBy, // now selected in the dropdown
+  timestamp: serverTimestamp()
+});
 
       expenseForm.reset();
     });
