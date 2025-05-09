@@ -75,8 +75,8 @@
       <label for="description">Description</label>
       <input type="text" id="description" required>
 
-      <label for="added-by">Added By</label>
-      <select id="added-by" required>
+      <label for="paid-by">Paid By</label>
+      <select id="paid-by" required>
         <option value="Ranveer">Ranveer</option>
         <option value="Aman">Aman</option>
       </select>
@@ -96,8 +96,8 @@
           <th>Number</th>
           <th>Amount</th>
           <th>Description</th>
-          <th>Paid By</th>
           <th>Added By</th>
+          <th>Paid By</th>
           <th>Action</th>
         </tr>
       </thead>
@@ -160,7 +160,7 @@
       const itemNumber = document.getElementById("item-number").value;
       const amount = parseFloat(document.getElementById("amount").value);
       const description = document.getElementById("description").value;
-      const addedBy = document.getElementById("added-by").value;
+      const paidBy = document.getElementById("paid-by").value;
 
       await addDoc(collection(db, "businessLogs"), {
         type,
@@ -168,7 +168,7 @@
         itemNumber,
         amount,
         description,
-        addedBy,
+        paidBy,
         user: currentUser.email.includes("ranveer") ? "Ranveer" : "Aman",
         timestamp: serverTimestamp()
       });
@@ -202,10 +202,10 @@
 
           // Settlement
           if (data.type === "Expense") {
-            if (data.addedBy === "Ranveer") amanBalance -= data.amount / 2;
+            if (data.paidBy === "Ranveer") amanBalance -= data.amount / 2;
             else ranveerBalance -= data.amount / 2;
           } else if (data.type === "Payment") {
-            if (data.addedBy === "Ranveer") amanBalance += data.amount / 2;
+            if (data.paidBy === "Ranveer") amanBalance += data.amount / 2;
             else ranveerBalance += data.amount / 2;
           }
 
@@ -231,7 +231,7 @@
             <td>₹${data.amount.toFixed(2)}</td>
             <td>${data.description}</td>
             <td>${data.user}</td>
-            <td>${data.addedBy}</td>
+            <td>${data.paidBy}</td>
             <td><button onclick="deleteEntry('${id}')">Delete</button></td>
           `;
           logTableBody.appendChild(row);
@@ -268,7 +268,7 @@
     }
 
     function exportCSV(data) {
-      const headers = ["Date/Time", "Type", "Item", "Number", "Amount", "Description", "Paid By", "Added By"];
+      const headers = ["Date/Time", "Type", "Item", "Number", "Amount", "Description", "Added By", "Paid By"];
       const rows = data.map(d => [
         d.timestamp?.toDate().toLocaleString() ?? "Unknown",
         d.type,
