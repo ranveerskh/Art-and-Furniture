@@ -7,10 +7,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.min.css" />
   <style>
     body {
-      padding: 0;
       margin: 0;
-      background: #f9f9f9;
       font-family: Arial, sans-serif;
+      background: #f9f9f9;
     }
     header {
       display: flex;
@@ -49,8 +48,31 @@
       0% { transform: translateX(0); }
       100% { transform: translateX(-50%); }
     }
-    .category-section {
+    .layout {
+      display: flex;
+    }
+    .sidebar {
+      width: 200px;
+      background: #fff;
       padding: 20px;
+      border-right: 1px solid #ccc;
+      height: calc(100vh - 140px);
+      overflow-y: auto;
+    }
+    .main {
+      flex: 1;
+      padding: 20px;
+    }
+    .category-button {
+      display: block;
+      margin-bottom: 10px;
+      background: #eaeaea;
+      border: none;
+      width: 100%;
+      text-align: left;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: pointer;
     }
     .category-title {
       font-size: 20px;
@@ -106,8 +128,6 @@
       <div class="slider-item">🆕 Check Out Our Newest Products!</div>
       <div class="slider-item">💥 50% OFF on Select Categories</div>
       <div class="slider-item">🚚 Free Shipping on Orders Over ₹999</div>
-      <div class="slider-item">🔥 Big Sale this Week!</div>
-      <div class="slider-item">🆕 Check Out Our Newest Products!</div>
     </div>
   </div>
 
@@ -119,7 +139,10 @@
     </div>
   </header>
 
-  <div id="products-container"></div>
+  <div class="layout">
+    <div class="sidebar" id="category-list"></div>
+    <div class="main" id="products-container"></div>
+  </div>
 
   <div class="cart-popup" id="cart-popup">
     <h4>Your Cart</h4>
@@ -128,6 +151,122 @@
     <button onclick="checkout()">Proceed to Checkout</button>
   </div>
 
-  <!-- Firebase and script block remain unchanged -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
+      authDomain: "epoxyresin-60ea7.firebaseapp.com",
+      projectId: "epoxyresin-60ea7",
+      storageBucket: "epoxyresin-60ea7.appspot.com",
+      messagingSenderId: "591026708184",
+      appId: "1:591026708184:web:0b9431b279a5b0026ec1ad"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const container = document.getElementById("products-container");
+    const sidebar = document.getElementById("category-list");
+    const searchInput = document.getElementById("search");
+    let allProducts = [];
+    let selectedCategory = "";
+
+    let cart = JSON.parse(localStorage.getItem("cart")) || [];
+    updateCartUI();
+
+    async function fetchProducts() {
+      const snapshot = await getDocs(collection(db, "products"));
+      allProducts = snapshot.docs.map(doc => doc.data());
+      renderCategoryList();
+      renderProducts();
+    }
+
+    function renderCategoryList() {
+      const categories = [...new Set(allProducts.map(p => p.category || "Uncategorized"))];
+      sidebar.innerHTML = "";
+      categories.forEach(cat => {
+        const btn = document.createElement("button");
+        btn.className = "category-button";
+        btn.textContent = cat;
+        btn.onclick = () => {
+          selectedCategory = cat;
+          renderProducts();
+        };
+        sidebar.appendChild(btn);
+      });
+    }
+
+    function renderProducts() {
+      const search = searchInput.value.toLowerCase();
+      const filtered = allProducts
+        .filter(p => (!selectedCategory || p.category === selectedCategory))
+        .filter(p => p.name?.toLowerCase().includes(search) || p.description?.toLowerCase().includes(search))
+        .sort((a, b) => (a.position || 0) - (b.position || 0));
+
+      container.innerHTML = "";
+      if (filtered.length === 0) {
+        container.innerHTML = "<p>No products found.</p>";
+        return;
+      }
+
+      const grid = document.createElement("div");
+      grid.className = "product-grid";
+      filtered.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "product";
+        div.innerHTML = `
+          <img src="${p.photoUrl}" alt="Product">
+          <h4>${p.name}</h4>
+          <p>${p.description}</p>
+          <p><strong>Price: ₹${p.price}</strong></p>
+          <button onclick='addToCart(${JSON.stringify(p)})'>Add to Cart</button>
+        `;
+        grid.appendChild(div);
+      });
+      container.appendChild(grid);
+    }
+
+    window.addToCart = function (item) {
+      cart.push(item);
+      localStorage.setItem("cart", JSON.stringify(cart));
+      updateCartUI();
+    };
+
+    function updateCartUI() {
+      cart = JSON.parse(localStorage.getItem("cart")) || [];
+      document.getElementById("cart-count").textContent = cart.length;
+      const cartItems = document.getElementById("cart-items");
+      const cartTotal = document.getElementById("cart-total");
+      cartItems.innerHTML = "";
+
+      let total = 0;
+      cart.forEach((item, i) => {
+        total += parseFloat(item.price);
+        const div = document.createElement("div");
+        div.className = "cart-item";
+        div.innerHTML = `${item.name} - ₹${item.price} <button onclick='removeFromCart(${i})'>❌</button>`;
+        cartItems.appendChild(div);
+      });
+      cartTotal.textContent = total.toFixed(2);
+    }
+
+    window.removeFromCart = function(index) {
+      cart.splice(index, 1);
+      localStorage.setItem("cart", JSON.stringify(cart));
+      updateCartUI();
+    }
+
+    window.toggleCart = function () {
+      const popup = document.getElementById("cart-popup");
+      popup.style.display = popup.style.display === "block" ? "none" : "block";
+    }
+
+    window.checkout = function () {
+      alert("🧾 Payment feature coming soon.");
+    }
+
+    fetchProducts();
+  </script>
 </body>
 </html>
