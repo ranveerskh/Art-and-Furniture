@@ -28,11 +28,19 @@
       border-radius: 5px;
       cursor: pointer;
     }
+    .category-section {
+      margin-top: 30px;
+    }
+    .category-title {
+      font-size: 20px;
+      margin-bottom: 10px;
+      color: #444;
+      border-bottom: 2px solid #ccc;
+    }
     .product-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 20px;
-      margin-top: 20px;
     }
     .product {
       background: white;
@@ -73,10 +81,13 @@
 <body>
   <header>
     <h2>🛍️ My Store</h2>
-    <button class="cart-btn" onclick="toggleCart()">View Cart (<span id="cart-count">0</span>)</button>
+    <div>
+      <input type="text" id="search" placeholder="Search..." oninput="renderProducts()">
+      <button class="cart-btn" onclick="toggleCart()">View Cart (<span id="cart-count">0</span>)</button>
+    </div>
   </header>
 
-  <div class="product-grid" id="product-list">Loading products...</div>
+  <div id="products-container"></div>
 
   <div class="cart-popup" id="cart-popup">
     <h4>Your Cart</h4>
@@ -100,35 +111,55 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-    const productList = document.getElementById("product-list");
-    const cartCount = document.getElementById("cart-count");
-    const cartPopup = document.getElementById("cart-popup");
-    const cartItemsDiv = document.getElementById("cart-items");
-    const cartTotal = document.getElementById("cart-total");
+    const container = document.getElementById("products-container");
+    const searchInput = document.getElementById("search");
+    let allProducts = [];
 
     let cart = JSON.parse(localStorage.getItem("cart")) || [];
     updateCartUI();
 
-    async function loadProducts() {
-      const querySnapshot = await getDocs(collection(db, "products"));
-      productList.innerHTML = "";
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        const productDiv = document.createElement("div");
-        productDiv.className = "product";
-        productDiv.innerHTML = `
-          <img src="${data.photoUrl}" alt="Product">
-          <h4>${data.name}</h4>
-          <p>${data.description}</p>
-          <p><strong>Item #: ${data.itemNumber}</strong></p>
-          <p><strong>Price: ₹${data.price}</strong></p>
-          <button onclick='addToCart(${JSON.stringify(data)})'>Add to Cart</button>
-        `;
-        productList.appendChild(productDiv);
-      });
+    async function fetchProducts() {
+      const snapshot = await getDocs(collection(db, "products"));
+      allProducts = snapshot.docs.map(doc => doc.data());
+      renderProducts();
     }
 
-    loadProducts();
+    function renderProducts() {
+      const search = searchInput.value.toLowerCase();
+      const grouped = {};
+
+      allProducts
+        .filter(p => p.name?.toLowerCase().includes(search) || p.description?.toLowerCase().includes(search))
+        .sort((a, b) => (a.position || 0) - (b.position || 0))
+        .forEach(p => {
+          const cat = p.category || "Uncategorized";
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat].push(p);
+        });
+
+      container.innerHTML = "";
+      for (const cat in grouped) {
+        const section = document.createElement("div");
+        section.className = "category-section";
+        section.innerHTML = `<div class='category-title'>${cat}</div><div class='product-grid'></div>`;
+        const grid = section.querySelector(".product-grid");
+
+        grouped[cat].forEach(p => {
+          const div = document.createElement("div");
+          div.className = "product";
+          div.innerHTML = `
+            <img src="${p.photoUrl}" alt="Product">
+            <h4>${p.name}</h4>
+            <p>${p.description}</p>
+            <p><strong>Price: ₹${p.price}</strong></p>
+            <button onclick='addToCart(${JSON.stringify(p)})'>Add to Cart</button>
+          `;
+          grid.appendChild(div);
+        });
+
+        container.appendChild(section);
+      }
+    }
 
     window.addToCart = function (item) {
       cart.push(item);
@@ -138,18 +169,18 @@
 
     function updateCartUI() {
       cart = JSON.parse(localStorage.getItem("cart")) || [];
-      cartCount.textContent = cart.length;
-      cartItemsDiv.innerHTML = "";
+      document.getElementById("cart-count").textContent = cart.length;
+      const cartItems = document.getElementById("cart-items");
+      const cartTotal = document.getElementById("cart-total");
+      cartItems.innerHTML = "";
+
       let total = 0;
-      cart.forEach((item, index) => {
+      cart.forEach((item, i) => {
         total += parseFloat(item.price);
         const div = document.createElement("div");
         div.className = "cart-item";
-        div.innerHTML = `
-          ${item.name} - ₹${item.price}
-          <button onclick='removeFromCart(${index})'>❌</button>
-        `;
-        cartItemsDiv.appendChild(div);
+        div.innerHTML = `${item.name} - ₹${item.price} <button onclick='removeFromCart(${i})'>❌</button>`;
+        cartItems.appendChild(div);
       });
       cartTotal.textContent = total.toFixed(2);
     }
@@ -161,12 +192,15 @@
     }
 
     window.toggleCart = function () {
-      cartPopup.style.display = cartPopup.style.display === "block" ? "none" : "block";
+      const popup = document.getElementById("cart-popup");
+      popup.style.display = popup.style.display === "block" ? "none" : "block";
     }
 
     window.checkout = function () {
-      alert("Payment integration coming soon! Cart saved in localStorage.");
+      alert("🧾 Payment feature coming soon.");
     }
+
+    fetchProducts();
   </script>
 </body>
 </html>
