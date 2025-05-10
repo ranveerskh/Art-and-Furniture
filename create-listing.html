@@ -31,6 +31,14 @@
     .error {
       color: red;
     }
+    #preview {
+      display: block;
+      margin: 10px auto;
+      max-width: 100%;
+      height: auto;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
@@ -51,6 +59,8 @@
 
       <label for="photoUrl">Image URL</label>
       <input type="url" id="photoUrl" required>
+
+      <img id="preview" src="" alt="Image Preview" style="display:none;" />
 
       <button type="submit">Add Product</button>
     </form>
@@ -79,10 +89,22 @@
     const form = document.getElementById("listing-form");
     const successMsg = document.getElementById("success-msg");
     const errorMsg = document.getElementById("error-msg");
+    const photoInput = document.getElementById("photoUrl");
+    const preview = document.getElementById("preview");
 
     onAuthStateChanged(auth, (user) => {
       if (!user) {
         window.location.href = "/login.html";
+      }
+    });
+
+    photoInput.addEventListener("input", () => {
+      const url = photoInput.value;
+      if (url) {
+        preview.src = url;
+        preview.style.display = "block";
+      } else {
+        preview.style.display = "none";
       }
     });
 
@@ -105,6 +127,7 @@
           timestamp: serverTimestamp()
         });
         form.reset();
+        preview.style.display = "none";
         successMsg.style.display = "block";
         errorMsg.style.display = "none";
       } catch (err) {
