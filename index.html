@@ -307,7 +307,7 @@
           (selectedFilter === "payment" && data.type !== "Payment")
         ) return false;
 
-        if (searchTerm && !data.itemName.toLowerCase().includes(searchTerm) && !data.description.toLowerCase().includes(searchTerm)) {
+        if (searchTerm && !data.itemName.toLowerCase().includes(searchTerm) && !data.description.toLowerCase().includes(searchTerm) && !data.itemNumber.toLowerCase().includes(searchTerm)) {
           return false;
         }
         return true;
