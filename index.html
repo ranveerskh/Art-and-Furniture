@@ -88,7 +88,51 @@
   <div class="container">
     <h1>📊 Business Tracker</h1>
     <p id="user">Loading...</p>
+
+    <form id="expense-form">
+      <label for="type">Type</label>
+      <select id="type" required>
+        <option value="Expense">Expense</option>
+        <option value="Payment">Payment</option>
+      </select>
+
+      <label for="item-name">Item Name</label>
+      <input type="text" id="item-name" required>
+
+      <label for="item-number">Item Number</label>
+      <input type="text" id="item-number" required>
+
+      <label for="amount">Amount</label>
+      <input type="number" id="amount" required>
+
+      <label for="description">Description</label>
+      <input type="text" id="description" required>
+
+      <label for="added-by">Paid By</label>
+      <select id="added-by" required>
+        <option value="Ranveer">Ranveer</option>
+        <option value="Aman">Aman</option>
+      </select>
+
+      <button type="submit">Submit Log</button>
+    </form>
+
+    <div class="settlement" id="settlement">Calculating settlement...</div>
+
+    <h2>Activity Log</h2>
+
+    <label for="filter">Filter Logs</label>
+    <select id="filter">
+      <option value="all">Show All</option>
+      <option value="month">This Month</option>
+      <option value="expense">Only Expenses</option>
+      <option value="payment">Only Payments</option>
+    </select>
+
+    <input type="text" id="search" placeholder="Search logs...">
     <button id="toggle-entries">Show All Entries</button>
+    <div id="loading">Loading entries...</div>
+
     <table>
       <thead>
         <tr>
@@ -105,12 +149,19 @@
       </thead>
       <tbody id="log-table-body"></tbody>
     </table>
+
+    <h2>Monthly & Yearly Summary</h2>
+    <div class="settlement" id="monthly-summary">Loading monthly summary...</div>
+    <div class="settlement" id="yearly-summary">Loading yearly summary...</div>
+
+    <button id="logout">Logout</button>
+    <button id="export-monthly">Export Monthly CSV</button>
   </div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-    import { getFirestore, collection, doc, deleteDoc, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA8hNmjkXT1SaCFJ0F7R2UvVoLpSZc3fKM",
@@ -125,26 +176,158 @@
     const auth = getAuth(app);
     const db = getFirestore(app);
 
+    const userLabel = document.getElementById("user");
+    const expenseForm = document.getElementById("expense-form");
     const logTableBody = document.getElementById("log-table-body");
+    const logoutBtn = document.getElementById("logout");
+    const settlementDiv = document.getElementById("settlement");
+    const monthlySummaryDiv = document.getElementById("monthly-summary");
+    const yearlySummaryDiv = document.getElementById("yearly-summary");
+    const exportMonthlyBtn = document.getElementById("export-monthly");
+    const filterSelect = document.getElementById("filter");
+    const searchInput = document.getElementById("search");
     const toggleBtn = document.getElementById("toggle-entries");
-    let showAll = false;
+    const loadingIndicator = document.getElementById("loading");
+
+    let currentUser = null;
+    let monthlyLogs = [];
     let allLogs = [];
+    let showAll = false;
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        currentUser = user;
+        userLabel.textContent = `Logged in as: ${user.email}`;
+        loadLogs();
+      } else {
+        window.location.href = "/login.html";
+      }
+    });
+
+    expenseForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        const type = document.getElementById("type").value;
+        const itemName = document.getElementById("item-name").value;
+        const itemNumber = document.getElementById("item-number").value;
+        const amount = parseFloat(document.getElementById("amount").value);
+        const description = document.getElementById("description").value;
+        const addedBy = document.getElementById("added-by").value;
+
+        await addDoc(collection(db, "businessLogs"), {
+          type,
+          itemName,
+          itemNumber,
+          amount,
+          description,
+          addedBy,
+          user: currentUser.email.includes("ranveer") ? "Ranveer" : "Aman",
+          timestamp: serverTimestamp()
+        });
+
+        expenseForm.reset();
+      } catch (error) {
+        alert("Failed to add entry. Please try again.");
+      }
+    });
+
+    function loadLogs() {
+      const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
+      onSnapshot(q, (snapshot) => {
+        allLogs = [];
+        monthlyLogs = [];
+        loadingIndicator.style.display = "none";
+
+        let ranveerBalance = 0;
+        let amanBalance = 0;
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        let monthlyIncome = 0;
+        let monthlyExpense = 0;
+        let yearlyIncome = 0;
+        let yearlyExpense = 0;
+
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          const id = docSnap.id;
+          const time = data.timestamp?.toDate();
+
+          allLogs.push({ ...data, id });
+
+          if (data.type === "Expense") {
+            if (data.addedBy === "Ranveer") amanBalance -= data.amount / 2;
+            else ranveerBalance -= data.amount / 2;
+          } else if (data.type === "Payment") {
+            if (data.addedBy === "Ranveer") amanBalance += data.amount / 2;
+            else ranveerBalance += data.amount / 2;
+          }
+
+          if (time && time.getFullYear() === currentYear) {
+            if (data.type === "Expense") yearlyExpense += data.amount;
+            if (data.type === "Payment") yearlyIncome += data.amount;
+
+            if (time.getMonth() === currentMonth) {
+              if (data.type === "Expense") monthlyExpense += data.amount;
+              if (data.type === "Payment") monthlyIncome += data.amount;
+              monthlyLogs.push({ ...data, timestamp: time });
+            }
+          }
+        });
+
+        renderLogs(allLogs);
+
+        const balance = ranveerBalance - amanBalance;
+        settlementDiv.textContent = balance > 0
+          ? `Aman owes Ranveer ₹${Math.abs(balance).toFixed(2)}`
+          : balance < 0
+          ? `Ranveer owes Aman ₹${Math.abs(balance).toFixed(2)}`
+          : "All Settled!";
+
+        const monthlyProfit = monthlyIncome - monthlyExpense;
+        const yearlyProfit = yearlyIncome - yearlyExpense;
+
+        monthlySummaryDiv.textContent = `Monthly Summary: Income ₹${monthlyIncome.toFixed(2)}, Expense ₹${monthlyExpense.toFixed(2)}, ${monthlyProfit < 0 ? "Loss" : "Profit"} ₹${Math.abs(monthlyProfit).toFixed(2)}`;
+        monthlySummaryDiv.style.backgroundColor = monthlyProfit < 0 ? "#f8d7da" : "#dff0d8";
+
+        yearlySummaryDiv.textContent = `Yearly Summary: Income ₹${yearlyIncome.toFixed(2)}, Expense ₹${yearlyExpense.toFixed(2)}, ${yearlyProfit < 0 ? "Loss" : "Profit"} ₹${Math.abs(yearlyProfit).toFixed(2)}`;
+        yearlySummaryDiv.style.backgroundColor = yearlyProfit < 0 ? "#f8d7da" : "#dff0d8";
+      });
+    }
 
     function renderLogs(logs) {
       logTableBody.innerHTML = "";
-      const visibleLogs = showAll ? logs : logs.slice(0, 10);
-      visibleLogs.forEach(log => {
+      const selectedFilter = filterSelect.value;
+      const searchTerm = searchInput.value.toLowerCase();
+
+      const filtered = logs.filter(data => {
+        if (
+          (selectedFilter === "month" && data.timestamp?.toDate().getMonth() !== new Date().getMonth()) ||
+          (selectedFilter === "expense" && data.type !== "Expense") ||
+          (selectedFilter === "payment" && data.type !== "Payment")
+        ) return false;
+
+        if (searchTerm && !data.itemName.toLowerCase().includes(searchTerm) && !data.description.toLowerCase().includes(searchTerm)) {
+          return false;
+        }
+        return true;
+      });
+
+      const displayLogs = showAll ? filtered : filtered.slice(0, 10);
+
+      displayLogs.forEach(data => {
+        const formattedTime = data.timestamp?.toDate().toLocaleString() ?? "Unknown";
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${log.timestamp?.toDate().toLocaleString() ?? "Unknown"}</td>
-          <td>${log.type}</td>
-          <td>${log.itemName}</td>
-          <td>${log.itemNumber}</td>
-          <td>₹${log.amount.toFixed(2)}</td>
-          <td>${log.description}</td>
-          <td>${log.user}</td>
-          <td>${log.addedBy}</td>
-          <td><button onclick="deleteEntry('${log.id}')">Delete</button></td>
+          <td>${formattedTime}</td>
+          <td>${data.type}</td>
+          <td>${data.itemName}</td>
+          <td>${data.itemNumber}</td>
+          <td>₹${data.amount.toFixed(2)}</td>
+          <td>${data.description}</td>
+          <td>${data.user}</td>
+          <td>${data.addedBy}</td>
+          <td><button onclick="deleteEntry('${data.id}')">Delete</button></td>
         `;
         logTableBody.appendChild(row);
       });
@@ -156,23 +339,39 @@
       renderLogs(allLogs);
     };
 
-    onAuthStateChanged(auth, user => {
-      if (user) {
-        const q = query(collection(db, "businessLogs"), orderBy("timestamp", "desc"));
-        onSnapshot(q, snapshot => {
-          allLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          renderLogs(allLogs);
-        });
-      } else {
-        window.location.href = "/login.html";
-      }
-    });
+    filterSelect.addEventListener("change", () => renderLogs(allLogs));
+    searchInput.addEventListener("input", () => renderLogs(allLogs));
+
+    exportMonthlyBtn.onclick = () => {
+      const headers = ["Date/Time", "Type", "Item", "Number", "Amount", "Description", "Paid By", "Added By"];
+      const rows = monthlyLogs.map(d => [
+        d.timestamp?.toLocaleString() ?? "Unknown",
+        d.type,
+        d.itemName,
+        d.itemNumber,
+        `₹${d.amount.toFixed(2)}`,
+        d.description,
+        d.user,
+        d.addedBy
+      ]);
+
+      let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+      rows.forEach(row => { csvContent += row.join(",") + "\n"; });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "monthly_logs.csv");
+      link.click();
+    };
 
     window.deleteEntry = async function(id) {
       if (confirm("Are you sure you want to delete this entry?")) {
         await deleteDoc(doc(db, "businessLogs", id));
       }
     };
+
+    logoutBtn.onclick = () => signOut(auth);
   </script>
 </body>
 </html>
